@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -27,6 +27,13 @@ const HeroSection: React.FC = () => {
       setEmail("");
       setIsLoading(false);
     }, 1500);
+  };
+
+  const scrollToNextSection = () => {
+    const nextSection = document.getElementById("pain-points");
+    if (nextSection) {
+      nextSection.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   return (
@@ -172,6 +179,17 @@ const HeroSection: React.FC = () => {
             </div>
           </div>
         </ScrollReveal>
+        
+        {/* Scroll Down Button */}
+        <div className="flex justify-center mt-10">
+          <button 
+            onClick={scrollToNextSection}
+            className="animate-bounce p-2 rounded-full bg-white/80 shadow-md hover:bg-white transition-colors duration-300"
+            aria-label="Scroll down to learn more"
+          >
+            <ChevronDown className="h-6 w-6 text-primary" />
+          </button>
+        </div>
       </div>
     </section>
   );
