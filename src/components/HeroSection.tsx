@@ -52,7 +52,7 @@ const HeroSection: React.FC = () => {
             </ScrollReveal>
             
             <AnimatedText
-              text={<>Don't Let <span className="text-primary">Mortgage Fraud</span> Put Your <span className="text-primary">Business</span> at Risk</>}
+              text="Don't Let Mortgage Fraud Put Your Business at Risk"
               tag="h1"
               className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 max-w-4xl tracking-tight text-balance"
               delay={300}

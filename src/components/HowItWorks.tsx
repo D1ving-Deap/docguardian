@@ -3,6 +3,7 @@ import React from "react";
 import { Upload, Sparkles, AlertTriangle, FileWarning, FileCheck, CheckCircle } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
+import { Button } from "@/components/ui/button";
 
 const HowItWorks: React.FC = () => {
   const steps = [
@@ -155,7 +156,7 @@ const HowItWorks: React.FC = () => {
         <ScrollReveal className="mt-16 text-center" delay={200}>
           <AnimatedText
             className="text-2xl font-bold mb-6"
-            text={<>Stop Fraud <span className="text-primary">Before</span> It Reaches Lenders</>}
+            text="Stop Fraud Before It Reaches Lenders"
           />
           <Button 
             onClick={() => {
