@@ -4,6 +4,7 @@ import NavBar from "@/components/NavBar";
 import HeroSection from "@/components/HeroSection";
 import PainPoints from "@/components/PainPoints";
 import Features from "@/components/Features";
+import HowItWorks from "@/components/HowItWorks";
 import FeatureShowcase from "@/components/FeatureShowcase";
 import WaitlistForm from "@/components/WaitlistForm";
 import Footer from "@/components/Footer";
@@ -21,6 +22,7 @@ const Index: React.FC = () => {
         <HeroSection />
         <PainPoints />
         <Features />
+        <HowItWorks />
         <FeatureShowcase />
         <WaitlistForm />
       </main>

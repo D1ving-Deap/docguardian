@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Brain, Bell, FileCheck, RefreshCw, BarChart3, Shield } from "lucide-react";
+import { Brain, Bell, FileCheck, RefreshCw, BarChart3, Shield, Search, FileText } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
 import { Button } from "./ui/button";
@@ -37,6 +37,12 @@ const Features: React.FC = () => {
       description: "No last-minute scrambling. Generate comprehensive verification reports instantly when regulators call.",
       color: "from-primary/70 to-primary/50",
     },
+    {
+      icon: <Search className="h-6 w-6 text-white" />,
+      title: "Pattern Recognition",
+      description: "Our AI gets smarter with each document it analyzes, spotting subtle inconsistencies humans often miss.",
+      color: "from-primary/60 to-primary/40",
+    },
   ];
 
   return (
@@ -47,7 +53,7 @@ const Features: React.FC = () => {
             The Solution
           </span>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Your Shield Against Mortgage Fraud
+            Your <span className="text-primary">Shield</span> Against Mortgage Fraud
           </h2>
           <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
             VerifyFlow is the only platform built specifically for Canadian mortgage brokers to detect fraud and protect your practice.
@@ -58,7 +64,7 @@ const Features: React.FC = () => {
           {features.map((feature, index) => (
             <ScrollReveal
               key={index}
-              className="rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+              className="rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1"
               delay={index * 150}
             >
               <div className="h-full flex flex-col">
@@ -67,7 +73,7 @@ const Features: React.FC = () => {
                     {feature.icon}
                   </div>
                 </div>
-                <div className="p-6 bg-white flex-grow border border-t-0 border-border/30 rounded-b-2xl">
+                <div className="p-6 bg-white flex-grow border border-t-0 border-border/30 rounded-b-xl">
                   <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
                   <p className="text-foreground/70">{feature.description}</p>
                 </div>
@@ -76,7 +82,7 @@ const Features: React.FC = () => {
           ))}
         </div>
 
-        <ScrollReveal className="mt-16 bg-secondary rounded-2xl p-8 border border-border/30" delay={300}>
+        <ScrollReveal className="mt-16 bg-secondary rounded-xl p-8 border border-border/30" delay={300}>
           <div className="flex flex-col md:flex-row items-center">
             <div className="w-16 h-16 flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center mb-6 md:mb-0 md:mr-6">
               <Shield className="h-8 w-8 text-primary" />
