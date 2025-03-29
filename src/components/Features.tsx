@@ -1,39 +1,40 @@
 
 import React from "react";
-import { Brain, Bell, FileCheck, RefreshCw, BarChart3 } from "lucide-react";
+import { Brain, Bell, FileCheck, RefreshCw, BarChart3, Shield } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
+import { Button } from "./ui/button";
 
 const Features: React.FC = () => {
   const features = [
     {
       icon: <Brain className="h-6 w-6 text-white" />,
-      title: "AI That Reads Between the Lines",
-      description: "We scan uploaded documents for signs of forgery, tampering, and data mismatches. Think: CRA notices, IDs, pay stubs, and more.",
+      title: "AI Document Analysis",
+      description: "We scan uploaded documents for signs of forgery, tampering, and data mismatches in CRA notices, IDs, pay stubs, and more.",
       color: "from-primary to-primary/80",
     },
     {
       icon: <Bell className="h-6 w-6 text-white" />,
       title: "Real-Time Red Flag Alerts",
-      description: "When something looks off, you know before it goes to the lender.",
+      description: "Instant notifications when suspicious activities or documents are detected, before they reach lenders.",
       color: "from-destructive to-destructive/80",
     },
     {
       icon: <FileCheck className="h-6 w-6 text-white" />,
-      title: "FSRA-Ready Checklists",
-      description: "Built-in compliance steps so you don't miss disclosures or verification duties.",
+      title: "FSRA-Ready Compliance",
+      description: "Built-in compliance checklists so you never miss disclosures or verification duties again.",
       color: "from-primary/90 to-primary/70",
     },
     {
       icon: <RefreshCw className="h-6 w-6 text-white" />,
       title: "Continuous Monitoring",
-      description: "We flag new issues even after the deal closes. You stay protected — always.",
+      description: "We flag new issues even after deal closing. Your protection remains active throughout the mortgage term.",
       color: "from-primary/80 to-primary/60",
     },
     {
       icon: <BarChart3 className="h-6 w-6 text-white" />,
-      title: "Audit-Ready Reports in 1 Click",
-      description: "No scrambling. No explaining. Just a clean file you can hand over.",
+      title: "One-Click Audit Reports",
+      description: "No last-minute scrambling. Generate comprehensive verification reports instantly when regulators call.",
       color: "from-primary/70 to-primary/50",
     },
   ];
@@ -46,10 +47,10 @@ const Features: React.FC = () => {
             The Solution
           </span>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            What VerifyFlow Does For You
+            Your Shield Against Mortgage Fraud
           </h2>
           <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
-            Our platform is built specifically for Canadian mortgage brokers to detect fraud and protect your business.
+            VerifyFlow is the only platform built specifically for Canadian mortgage brokers to detect fraud and protect your practice.
           </p>
         </ScrollReveal>
 
@@ -57,7 +58,7 @@ const Features: React.FC = () => {
           {features.map((feature, index) => (
             <ScrollReveal
               key={index}
-              className="rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
+              className="rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1"
               delay={index * 150}
             >
               <div className="h-full flex flex-col">
@@ -78,21 +79,35 @@ const Features: React.FC = () => {
         <ScrollReveal className="mt-16 bg-secondary rounded-2xl p-8 border border-border/30" delay={300}>
           <div className="flex flex-col md:flex-row items-center">
             <div className="w-16 h-16 flex-shrink-0 rounded-full bg-primary/10 flex items-center justify-center mb-6 md:mb-0 md:mr-6">
-              <span className="text-primary text-xl">🇨🇦</span>
+              <Shield className="h-8 w-8 text-primary" />
             </div>
             <div className="text-center md:text-left">
               <h3 className="text-xl font-semibold mb-3">Built for Canadian Brokers. Period.</h3>
               <ul className="text-foreground/70 space-y-2">
                 <li className="flex items-center justify-center md:justify-start">
-                  <span className="mr-2">•</span> No bloated CRM features.
+                  <span className="mr-2">•</span> No bloated CRM features you'll never use
                 </li>
                 <li className="flex items-center justify-center md:justify-start">
-                  <span className="mr-2">•</span> No overseas "AI" gimmicks.
+                  <span className="mr-2">•</span> No overseas "AI" gimmicks with poor accuracy
                 </li>
                 <li className="flex items-center justify-center md:justify-start">
-                  <span className="mr-2">•</span> Just a fast, focused layer of protection between you and mortgage fraud.
+                  <span className="mr-2">•</span> Just a fast, focused layer of protection between you and mortgage fraud
                 </li>
               </ul>
+              
+              <div className="mt-6 flex justify-center md:justify-start">
+                <Button 
+                  onClick={() => {
+                    const waitlistSection = document.getElementById("waitlist");
+                    if (waitlistSection) {
+                      waitlistSection.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                  className="bg-primary hover:bg-primary/90 text-white"
+                >
+                  Join the Waitlist
+                </Button>
+              </div>
             </div>
           </div>
         </ScrollReveal>

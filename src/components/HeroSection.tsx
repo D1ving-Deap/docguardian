@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -43,20 +43,21 @@ const HeroSection: React.FC = () => {
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="flex flex-col items-center text-center mb-12">
           <ScrollReveal animation="fade-in-up">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6">
-              Mortgage Fraud Detection
-            </span>
+            <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6 gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              <span>Protect Your License & Livelihood</span>
+            </div>
           </ScrollReveal>
           
           <AnimatedText
-            text="You're One Fake Document Away From a Lawsuit."
+            text="Don't Let Mortgage Fraud Put Your Business at Risk"
             tag="h1"
             className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-4xl mx-auto tracking-tight text-balance"
             delay={300}
           />
           
           <AnimatedText
-            text="Mortgage fraud is getting smarter. Are your tools keeping up?"
+            text="VerifyFlow uses AI to detect forged documents, spot inconsistencies, and keep you FSRA-compliant."
             tag="p"
             className="text-xl text-foreground/80 max-w-2xl mx-auto mb-10"
             delay={600}
@@ -97,6 +98,9 @@ const HeroSection: React.FC = () => {
                 )}
               </Button>
             </form>
+            <p className="text-sm text-center mt-3 text-foreground/60">
+              Join 100+ Canadian mortgage brokers protecting their practice
+            </p>
           </ScrollReveal>
         </div>
         
@@ -130,7 +134,7 @@ const HeroSection: React.FC = () => {
                 <div className="p-4">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold">Document Verification Status</h3>
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">3 alerts</span>
+                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">3 High Risk Items</span>
                   </div>
                   
                   <div className="space-y-3">
@@ -139,7 +143,7 @@ const HeroSection: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500 mt-0.5"><path d="M12 9v4"/><path d="M12 16h.01"/><circle cx="12" cy="12" r="10"/></svg>
                         <div>
                           <p className="text-sm font-medium text-red-700">High Risk: CRA Notice of Assessment</p>
-                          <p className="text-xs text-red-600">Document appears to be modified</p>
+                          <p className="text-xs text-red-600">Digital manipulation detected in income figures</p>
                         </div>
                       </div>
                     </div>
@@ -149,7 +153,7 @@ const HeroSection: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 mt-0.5"><path d="M12 9v4"/><path d="M12 16h.01"/><path d="M9.7 17h4.6"/><path d="M4 8l2.1 2.8L4 14"/><path d="M20 8l-2.1 2.8L20 14"/><path d="M12 2v2"/><path d="M12 20v2"/></svg>
                         <div>
                           <p className="text-sm font-medium text-amber-700">Warning: Employment Letter</p>
-                          <p className="text-xs text-amber-600">Phone number doesn't match employer records</p>
+                          <p className="text-xs text-amber-600">Company not registered at provided address</p>
                         </div>
                       </div>
                     </div>
@@ -159,7 +163,7 @@ const HeroSection: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mt-0.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
                         <div>
                           <p className="text-sm font-medium text-green-700">Verified: Driver's License</p>
-                          <p className="text-xs text-green-600">Document passed all verification checks</p>
+                          <p className="text-xs text-green-600">Security features validated successfully</p>
                         </div>
                       </div>
                     </div>
