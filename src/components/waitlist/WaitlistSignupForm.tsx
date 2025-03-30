@@ -32,10 +32,14 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
     setIsLoading(true);
     
     try {
+      // Generate a hash from the email to use as a numeric identifier
+      // For simplicity, we'll use a basic hash function
+      const emailHash = hashCode(email);
+      
       const { data: existingEmails } = await supabase
         .from('Gmail Waitlist')
         .select('User Email')
-        .eq('User Email', email);
+        .eq('User Email', emailHash);
       
       if (existingEmails && existingEmails.length > 0) {
         toast.info("You're already on our waitlist!");
@@ -45,7 +49,7 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
       
       const { error } = await supabase
         .from('Gmail Waitlist')
-        .insert([{ 'User Email': email }]);
+        .insert([{ 'User Email': emailHash }]);
       
       if (error) {
         console.error("Error adding to waitlist:", error);
@@ -62,6 +66,17 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Simple string hash function that returns a number
+  const hashCode = (str: string): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
   };
 
   return (
