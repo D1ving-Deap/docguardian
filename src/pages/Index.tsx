@@ -21,22 +21,24 @@ const Index: React.FC = () => {
     // Test Supabase connection
     const testConnection = async () => {
       try {
-        // Just a simple query to test the connection
-        const { data, error } = await supabase.from('_dummy_query').select('*').limit(1).maybeSingle();
+        // Query the Waitlist table which exists in our database
+        const { data, error } = await supabase.from('Waitlist').select('*').limit(1);
         
-        if (error && error.code !== 'PGRST116') {
-          // If error is not the expected "relation does not exist" error
+        if (error) {
           console.error("Supabase connection error:", error);
           setConnectionStatus('error');
+          toast.error("Could not connect to database");
           return;
         }
         
-        // If we get here, connection is working (even with the expected table missing error)
+        // Connection successful
         setConnectionStatus('connected');
         console.log("Supabase connection successful");
+        toast.success("Connected to database");
       } catch (err) {
         console.error("Supabase connection test failed:", err);
         setConnectionStatus('error');
+        toast.error("Failed to test database connection");
       }
     };
     
