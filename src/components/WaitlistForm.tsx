@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { ArrowRight, Lock, CheckCircle2, Clock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { cn } from "@/lib/utils";
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
 import { supabase } from "@/integrations/supabase/client";
+import { generateNumericHash } from "@/utils/hashUtils";
 
 const WaitlistForm: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -31,7 +31,7 @@ const WaitlistForm: React.FC = () => {
     
     try {
       // Convert the email to a numeric value for the database
-      const emailHash = await generateNumericHash(email);
+      const emailHash = generateNumericHash(email);
       
       // Check if email already exists in the waitlist
       const { data: existingEmails, error: selectError } = await supabase
@@ -52,7 +52,7 @@ const WaitlistForm: React.FC = () => {
         return;
       }
       
-      // Insert new email hash into the waitlist
+      // Insert new email hash into the waitlist as a single object
       const { error: insertError } = await supabase
         .from('Gmail Waitlist')
         .insert({ 'User Email': emailHash });
@@ -72,18 +72,6 @@ const WaitlistForm: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Generate a consistent numeric value from a string
-  const generateNumericHash = async (str: string): Promise<number> => {
-    // Using a more reliable method to generate numeric hash
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash);
   };
 
   const benefits = [

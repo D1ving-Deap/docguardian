@@ -19,8 +19,13 @@ const Index: React.FC = () => {
     // Test Supabase connection
     const testConnection = async () => {
       try {
+        console.log("Testing Supabase connection...");
+        
         // Query the Gmail Waitlist table which exists in our database
-        const { data, error } = await supabase.from('Gmail Waitlist').select('*').limit(1);
+        const { data, error } = await supabase
+          .from('Gmail Waitlist')
+          .select('*')
+          .limit(1);
         
         if (error) {
           console.error("Supabase connection error:", error);
@@ -29,7 +34,7 @@ const Index: React.FC = () => {
         }
         
         // Connection successful
-        console.log("Supabase connection successful");
+        console.log("Supabase connection successful:", data);
         toast.success("Connected to database");
       } catch (err) {
         console.error("Supabase connection test failed:", err);
