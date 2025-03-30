@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import HeroSection from "@/components/HeroSection";
 import PainPoints from "@/components/PainPoints";
@@ -12,8 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const Index: React.FC = () => {
-  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
-
   useEffect(() => {
     // Scroll to top when component mounts
     window.scrollTo(0, 0);
@@ -26,18 +24,15 @@ const Index: React.FC = () => {
         
         if (error) {
           console.error("Supabase connection error:", error);
-          setConnectionStatus('error');
           toast.error("Could not connect to database");
           return;
         }
         
         // Connection successful
-        setConnectionStatus('connected');
         console.log("Supabase connection successful");
         toast.success("Connected to database");
       } catch (err) {
         console.error("Supabase connection test failed:", err);
-        setConnectionStatus('error');
         toast.error("Failed to test database connection");
       }
     };

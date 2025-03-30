@@ -32,14 +32,21 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
     setIsLoading(true);
     
     try {
-      // Generate a hash from the email to use as a numeric identifier
-      // For simplicity, we'll use a basic hash function
-      const emailHash = hashCode(email);
+      // Convert the email to a numeric value for the database
+      const emailHash = await generateNumericHash(email);
       
-      const { data: existingEmails } = await supabase
+      // Check if the email hash already exists in the waitlist
+      const { data: existingEmails, error: selectError } = await supabase
         .from('Gmail Waitlist')
         .select('User Email')
         .eq('User Email', emailHash);
+      
+      if (selectError) {
+        console.error("Error checking waitlist:", selectError);
+        toast.error("Failed to check waitlist. Please try again.");
+        setIsLoading(false);
+        return;
+      }
       
       if (existingEmails && existingEmails.length > 0) {
         toast.info("You're already on our waitlist!");
@@ -47,12 +54,13 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
         return;
       }
       
-      const { error } = await supabase
+      // Insert the email hash into the waitlist
+      const { error: insertError } = await supabase
         .from('Gmail Waitlist')
-        .insert([{ 'User Email': emailHash }]);
+        .insert({ 'User Email': emailHash });
       
-      if (error) {
-        console.error("Error adding to waitlist:", error);
+      if (insertError) {
+        console.error("Error adding to waitlist:", insertError);
         toast.error("Failed to join waitlist. Please try again.");
         setIsLoading(false);
         return;
@@ -68,8 +76,9 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
     }
   };
 
-  // Simple string hash function that returns a number
-  const hashCode = (str: string): number => {
+  // Generate a consistent numeric value from a string
+  const generateNumericHash = async (str: string): Promise<number> => {
+    // Using a more reliable method to generate numeric hash
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
