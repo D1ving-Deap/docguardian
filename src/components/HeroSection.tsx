@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ArrowRight, ChevronDown, ShieldCheck, AlertTriangle, Zap, Check } from "lucide-react";
+import { ArrowRight, ChevronDown, ShieldCheck, AlertTriangle, Zap, Check, FileText, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -111,97 +111,122 @@ const HeroSection: React.FC = () => {
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
                   <Check className="h-3 w-3 text-green-600" />
                 </div>
-                <span className="text-sm">AI-powered document fraud detection</span>
+                <span className="text-sm">AI-powered document <span className="text-primary font-semibold">fraud detection</span></span>
               </ScrollReveal>
               <ScrollReveal delay={1100} className="flex items-center gap-2">
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center">
                   <AlertTriangle className="h-3 w-3 text-amber-600" />
                 </div>
-                <span className="text-sm">Real-time red flag alerts</span>
+                <span className="text-sm">Real-time <span className="text-primary font-semibold">red flag alerts</span></span>
               </ScrollReveal>
               <ScrollReveal delay={1200} className="flex items-center gap-2">
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
                   <Zap className="h-3 w-3 text-blue-600" />
                 </div>
-                <span className="text-sm">One-click audit reports</span>
+                <span className="text-sm">One-click <span className="text-primary font-semibold">audit reports</span></span>
               </ScrollReveal>
             </div>
           </div>
           
-          {/* Right Column - Dashboard Preview */}
+          {/* Right Column - Fraud Alert Infographic */}
           <div className="w-full md:w-1/2 mt-10 md:mt-0">
             <ScrollReveal
-              className="w-full rounded-lg overflow-hidden shadow-xl"
+              className="w-full"
               delay={800}
               animation="fade-in-right"
             >
-              <div className="w-full bg-gradient-to-br from-primary/5 to-primary/20 p-4">
-                <div className="rounded-lg border border-white/20 bg-white/95 backdrop-blur-sm overflow-hidden shadow-lg">
-                  {/* Dashboard Header */}
-                  <div className="bg-primary/10 p-3 border-b border-border/20">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
-                          <span className="text-primary font-semibold text-xs">VF</span>
-                        </div>
-                        <span className="font-semibold text-sm text-foreground">Document Analysis</span>
-                      </div>
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-border/30">
+                {/* Infographic Header */}
+                <div className="bg-red-50 p-4 border-b border-red-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                      <Flag className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-red-700">Mortgage Fraud Alert</h3>
+                      <p className="text-sm text-red-600">Common red flags that could put your license at risk</p>
                     </div>
                   </div>
-                  
-                  {/* Document Analysis Preview */}
-                  <div className="p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-sm font-semibold">Verification Results</h3>
-                      <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">2 Issues Found</span>
+                </div>
+                
+                {/* Infographic Content */}
+                <div className="p-6">
+                  {/* Document Warning Signs */}
+                  <div className="space-y-4">
+                    <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                      <h4 className="text-md font-semibold flex items-center gap-2 mb-2">
+                        <FileText className="h-4 w-4 text-red-600" />
+                        <span>Document Tampering</span>
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="flex items-start gap-2">
+                          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-xs text-red-600 font-bold">!</span>
+                          </div>
+                          <span className="text-sm text-foreground/80">Inconsistent fonts or formatting</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-xs text-red-600 font-bold">!</span>
+                          </div>
+                          <span className="text-sm text-foreground/80">Pixelated text or uneven alignment</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-xs text-red-600 font-bold">!</span>
+                          </div>
+                          <span className="text-sm text-foreground/80">Missing security features</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-xs text-red-600 font-bold">!</span>
+                          </div>
+                          <span className="text-sm text-foreground/80">Digital editing artifacts</span>
+                        </div>
+                      </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      {/* Income Statement Analysis */}
-                      <div className="p-3 border border-red-100 bg-red-50 rounded-md relative overflow-hidden">
-                        <div className="flex gap-2">
-                          <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium text-red-800">Inconsistent Pay Stub</p>
-                            <p className="text-xs text-red-700">YTD total doesn't match sum of payments</p>
-                            <div className="mt-2 p-2 bg-white/80 rounded border border-red-200">
-                              <div className="flex items-center justify-between text-xs">
-                                <span>Reported YTD:</span>
-                                <span className="text-red-600 font-medium relative">
-                                  $42,350
-                                  <span className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-red-500 rounded"></span>
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs mt-1">
-                                <span>Calculated YTD:</span>
-                                <span className="font-medium">$36,150</span>
-                              </div>
-                            </div>
-                          </div>
+                    <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                      <h4 className="text-md font-semibold flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <span>Income Verification Issues</span>
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2 bg-white rounded border border-amber-100">
+                          <span className="text-sm">NOA Income:</span>
+                          <span className="text-sm font-medium">$85,000</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 bg-white rounded border border-amber-100">
+                          <span className="text-sm">Pay Stub YTD:</span>
+                          <span className="text-sm font-medium text-amber-700 relative">
+                            $68,000
+                            <span className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-amber-500"></span>
+                          </span>
+                        </div>
+                        <div className="text-xs text-amber-700 italic mt-1">
+                          * 20% difference detected (high risk)
                         </div>
                       </div>
-                      
-                      {/* Document Tampering Detection */}
-                      <div className="p-3 border border-amber-100 bg-amber-50 rounded-md relative overflow-hidden">
-                        <div className="flex gap-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium text-amber-800">Digital Manipulation Detected</p>
-                            <p className="text-xs text-amber-700">Tax Notice of Assessment shows editing artifacts</p>
-                          </div>
-                        </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-primary" />
+                        <span className="text-sm font-medium">VerifyFlow protects you from these risks</span>
                       </div>
-                      
-                      {/* Verified Document */}
-                      <div className="p-3 border border-green-100 bg-green-50 rounded-md">
-                        <div className="flex gap-2">
-                          <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium text-green-800">Verified ID Document</p>
-                            <p className="text-xs text-green-700">Security features validated successfully</p>
-                          </div>
-                        </div>
-                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-primary border-primary/30 hover:bg-primary/5"
+                        onClick={() => {
+                          const featuresSection = document.getElementById("features");
+                          if (featuresSection) {
+                            featuresSection.scrollIntoView({ behavior: "smooth" });
+                          }
+                        }}
+                      >
+                        Learn More
+                      </Button>
                     </div>
                   </div>
                 </div>
