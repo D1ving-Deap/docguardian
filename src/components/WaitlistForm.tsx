@@ -7,26 +7,61 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
+import { supabase } from "@/integrations/supabase/client";
 
 const WaitlistForm: React.FC = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       toast.error("Please enter your email address.");
       return;
     }
 
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Check if email already exists in the waitlist
+      const { data: existingEmails } = await supabase
+        .from('Waitlist')
+        .select('email')
+        .eq('email', email);
+      
+      if (existingEmails && existingEmails.length > 0) {
+        toast.info("You're already on our waitlist!");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Insert new email into the waitlist
+      const { error } = await supabase
+        .from('Waitlist')
+        .insert([{ email }]);
+      
+      if (error) {
+        console.error("Error adding to waitlist:", error);
+        toast.error("Failed to join waitlist. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+      
       toast.success("Thanks for joining our waitlist!");
       setEmail("");
+    } catch (err) {
+      console.error("Waitlist submission error:", err);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const benefits = [

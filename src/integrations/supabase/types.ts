@@ -9,17 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      "Gmail Waitlist": {
+        Row: {
+          created_at: string
+          "User Email": number
+        }
+        Insert: {
+          created_at?: string
+          "User Email"?: number
+        }
+        Update: {
+          created_at?: string
+          "User Email"?: number
+        }
+        Relationships: []
+      }
       Waitlist: {
         Row: {
           created_at: string
+          email: string
           id: number
         }
         Insert: {
           created_at?: string
+          email: string
           id?: number
         }
         Update: {
           created_at?: string
+          email?: string
           id?: number
         }
         Relationships: []

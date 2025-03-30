@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ArrowRight, ChevronDown, ShieldCheck, AlertTriangle, Zap, Check, FileText, Flag } from "lucide-react";
@@ -7,26 +6,58 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
+import { supabase } from "@/integrations/supabase/client";
 
 const HeroSection: React.FC = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       toast.error("Please enter your email address.");
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const { data: existingEmails } = await supabase
+        .from('Waitlist')
+        .select('email')
+        .eq('email', email);
+      
+      if (existingEmails && existingEmails.length > 0) {
+        toast.info("You're already on our waitlist!");
+        setIsLoading(false);
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('Waitlist')
+        .insert([{ email }]);
+      
+      if (error) {
+        console.error("Error adding to waitlist:", error);
+        toast.error("Failed to join waitlist. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+      
       toast.success("Thanks for joining our waitlist!");
       setEmail("");
+    } catch (err) {
+      console.error("Waitlist submission error:", err);
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const scrollToNextSection = () => {
@@ -42,7 +73,6 @@ const HeroSection: React.FC = () => {
       
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="flex flex-col md:flex-row items-center gap-8">
-          {/* Left Column - Text Content */}
           <div className="w-full md:w-1/2 text-center md:text-left">
             <ScrollReveal animation="fade-in-up">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6 gap-2">
@@ -105,7 +135,6 @@ const HeroSection: React.FC = () => {
               </p>
             </ScrollReveal>
             
-            {/* Feature Bullets */}
             <div className="mt-8 space-y-3">
               <ScrollReveal delay={1000} className="flex items-center gap-2">
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
@@ -128,7 +157,6 @@ const HeroSection: React.FC = () => {
             </div>
           </div>
           
-          {/* Right Column - Fraud Alert Infographic */}
           <div className="w-full md:w-1/2 mt-10 md:mt-0">
             <ScrollReveal
               className="w-full"
@@ -136,7 +164,6 @@ const HeroSection: React.FC = () => {
               animation="fade-in-right"
             >
               <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-border/30">
-                {/* Infographic Header */}
                 <div className="bg-red-50 p-4 border-b border-red-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
@@ -149,9 +176,7 @@ const HeroSection: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Infographic Content */}
                 <div className="p-6">
-                  {/* Document Warning Signs */}
                   <div className="space-y-4">
                     <div className="bg-red-50 rounded-lg p-4 border border-red-100">
                       <h4 className="text-md font-semibold flex items-center gap-2 mb-2">
@@ -235,7 +260,6 @@ const HeroSection: React.FC = () => {
           </div>
         </div>
         
-        {/* Scroll Down Button */}
         <div className="flex justify-center mt-8">
           <button 
             onClick={scrollToNextSection}
