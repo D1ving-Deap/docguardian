@@ -33,9 +33,9 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
     
     try {
       const { data: existingEmails } = await supabase
-        .from('Waitlist')
-        .select('email')
-        .eq('email', email);
+        .from('Gmail Waitlist')
+        .select('User Email')
+        .eq('User Email', email);
       
       if (existingEmails && existingEmails.length > 0) {
         toast.info("You're already on our waitlist!");
@@ -44,8 +44,8 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
       }
       
       const { error } = await supabase
-        .from('Waitlist')
-        .insert([{ email }]);
+        .from('Gmail Waitlist')
+        .insert([{ 'User Email': email }]);
       
       if (error) {
         console.error("Error adding to waitlist:", error);

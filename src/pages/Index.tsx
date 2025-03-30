@@ -21,8 +21,8 @@ const Index: React.FC = () => {
     // Test Supabase connection
     const testConnection = async () => {
       try {
-        // Query the Waitlist table which exists in our database
-        const { data, error } = await supabase.from('Waitlist').select('*').limit(1);
+        // Query the Gmail Waitlist table which exists in our database
+        const { data, error } = await supabase.from('Gmail Waitlist').select('*').limit(1);
         
         if (error) {
           console.error("Supabase connection error:", error);

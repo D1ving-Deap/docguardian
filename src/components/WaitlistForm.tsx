@@ -32,9 +32,9 @@ const WaitlistForm: React.FC = () => {
     try {
       // Check if email already exists in the waitlist
       const { data: existingEmails } = await supabase
-        .from('Waitlist')
-        .select('email')
-        .eq('email', email);
+        .from('Gmail Waitlist')
+        .select('User Email')
+        .eq('User Email', email);
       
       if (existingEmails && existingEmails.length > 0) {
         toast.info("You're already on our waitlist!");
@@ -44,8 +44,8 @@ const WaitlistForm: React.FC = () => {
       
       // Insert new email into the waitlist
       const { error } = await supabase
-        .from('Waitlist')
-        .insert([{ email }]);
+        .from('Gmail Waitlist')
+        .insert([{ 'User Email': email }]);
       
       if (error) {
         console.error("Error adding to waitlist:", error);

@@ -24,48 +24,6 @@ export type Database = {
         }
         Relationships: []
       }
-      waitlist: {
-        Row: {
-          created_at: string | null
-          email: string
-          id: number
-          name: string
-          response: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          id?: never
-          name: string
-          response?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          id?: never
-          name?: string
-          response?: string | null
-        }
-        Relationships: []
-      }
-      Waitlist: {
-        Row: {
-          created_at: string
-          email: string
-          id: number
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: number
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: number
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
