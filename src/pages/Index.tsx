@@ -21,21 +21,21 @@ const Index: React.FC = () => {
       try {
         console.log("Testing Supabase connection...");
         
-        // Query the Gmail Waitlist table which exists in our database
+        // Simple connection test - fetch version to avoid any permission issues
         const { data, error } = await supabase
           .from('Gmail Waitlist')
-          .select('*')
+          .select('created_at')
           .limit(1);
         
         if (error) {
           console.error("Supabase connection error:", error);
-          toast.error("Could not connect to database");
+          toast.error("Database connection issue: " + error.message);
           return;
         }
         
         // Connection successful
-        console.log("Supabase connection successful:", data);
-        toast.success("Connected to database");
+        console.log("Supabase connection successful");
+        toast.success("Database connection successful");
       } catch (err) {
         console.error("Supabase connection test failed:", err);
         toast.error("Failed to test database connection");

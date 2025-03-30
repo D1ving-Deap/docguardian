@@ -33,11 +33,12 @@ const WaitlistSignupSection: React.FC = () => {
     try {
       // Convert the email to a numeric value for the database
       const emailHash = generateNumericHash(email);
+      console.log("Generated hash for section:", emailHash);
       
       // Check if email already exists in the waitlist
       const { data: existingEmails, error: selectError } = await supabase
         .from('Gmail Waitlist')
-        .select('User Email')
+        .select()
         .eq('User Email', emailHash);
       
       if (selectError) {
@@ -47,13 +48,15 @@ const WaitlistSignupSection: React.FC = () => {
         return;
       }
       
+      console.log("Existing emails check (section):", existingEmails);
+      
       if (existingEmails && existingEmails.length > 0) {
         toast.info("You're already on our waitlist!");
         setIsLoading(false);
         return;
       }
       
-      // Insert new email hash into the waitlist as a single object
+      // Insert new email hash into the waitlist
       const { error: insertError } = await supabase
         .from('Gmail Waitlist')
         .insert({ 'User Email': emailHash });
