@@ -21,20 +21,22 @@ const Index: React.FC = () => {
       try {
         console.log("Testing Supabase connection...");
         
-        // Simple connection test - fetch version to avoid any permission issues
+        // Simple connection test using system schema to avoid permission issues
         const { data, error } = await supabase
           .from('Gmail Waitlist')
           .select('created_at')
           .limit(1);
         
+        console.log("Connection test response:", { data, error });
+        
         if (error) {
           console.error("Supabase connection error:", error);
-          toast.error("Database connection issue: " + error.message);
+          toast.error(`Database connection issue: ${error.message}`);
           return;
         }
         
         // Connection successful
-        console.log("Supabase connection successful");
+        console.log("Supabase connection successful", data);
         toast.success("Database connection successful");
       } catch (err) {
         console.error("Supabase connection test failed:", err);
@@ -42,6 +44,7 @@ const Index: React.FC = () => {
       }
     };
     
+    // Run the connection test
     testConnection();
   }, []);
 
