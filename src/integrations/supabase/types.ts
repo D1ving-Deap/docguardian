@@ -12,15 +12,15 @@ export type Database = {
       "Gmail Waitlist": {
         Row: {
           created_at: string
-          "User Email": number
+          "User Email": string
         }
         Insert: {
           created_at?: string
-          "User Email"?: number
+          "User Email": string
         }
         Update: {
           created_at?: string
-          "User Email"?: number
+          "User Email"?: string
         }
         Relationships: []
       }

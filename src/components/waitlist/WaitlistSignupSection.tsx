@@ -6,7 +6,6 @@ import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { generateNumericHash } from "@/utils/hashUtils";
 import ScrollReveal from "../ScrollReveal";
 import Testimonial from "./Testimonial";
 
@@ -30,15 +29,11 @@ const WaitlistSignupSection: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Convert the email to a numeric value for the database
-      const emailHash = generateNumericHash(email);
-      console.log("Generated hash:", emailHash);
-      
       // Check if email already exists in waitlist
       const { data: existingEmails, error: selectError } = await supabase
         .from('Gmail Waitlist')
         .select()
-        .eq('User Email', emailHash);
+        .eq('User Email', email);
       
       if (selectError) {
         console.error("Error checking waitlist:", selectError);
@@ -55,10 +50,10 @@ const WaitlistSignupSection: React.FC = () => {
         return;
       }
       
-      // Insert the email hash into the waitlist
+      // Insert the email into the waitlist
       const { data: insertData, error: insertError } = await supabase
         .from('Gmail Waitlist')
-        .insert({ 'User Email': emailHash })
+        .insert({ 'User Email': email })
         .select();
       
       console.log("Insert response:", { insertData, insertError });
