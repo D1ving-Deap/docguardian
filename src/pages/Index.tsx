@@ -21,14 +21,17 @@ const Index: React.FC = () => {
       try {
         console.log("Testing Supabase connection...");
         
-        // Try to get RLS version - this is a public endpoint that any user can access
+        // Try to check connection by getting table data instead of using rpc
+        // This avoids the TypeScript error with the 'version' function that doesn't exist
         const { data: versionData, error: versionError } = await supabase
-          .rpc('version');
+          .from('Gmail Waitlist')
+          .select('created_at')
+          .limit(1);
 
-        console.log("Version request response:", { versionData, versionError });
+        console.log("Connection test response:", { versionData, versionError });
         
         if (versionError) {
-          console.error("Supabase connection error (version check):", versionError);
+          console.error("Supabase connection error:", versionError);
         } else {
           console.log("Supabase API connection successful");
         }
