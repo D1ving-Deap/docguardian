@@ -21,22 +21,34 @@ const Index: React.FC = () => {
       try {
         console.log("Testing Supabase connection...");
         
-        // Simple connection test using system schema to avoid permission issues
+        // Try to get RLS version - this is a public endpoint that any user can access
+        const { data: versionData, error: versionError } = await supabase
+          .rpc('version');
+
+        console.log("Version request response:", { versionData, versionError });
+        
+        if (versionError) {
+          console.error("Supabase connection error (version check):", versionError);
+        } else {
+          console.log("Supabase API connection successful");
+        }
+        
+        // Also test connection to the waitlist table with our new RLS policies
         const { data, error } = await supabase
           .from('Gmail Waitlist')
           .select('created_at')
           .limit(1);
         
-        console.log("Connection test response:", { data, error });
+        console.log("Waitlist table test response:", { data, error });
         
         if (error) {
-          console.error("Supabase connection error:", error);
+          console.error("Waitlist table access error:", error);
           toast.error(`Database connection issue: ${error.message}`);
           return;
         }
         
         // Connection successful
-        console.log("Supabase connection successful", data);
+        console.log("Supabase waitlist table connection successful", data);
         toast.success("Database connection successful");
       } catch (err) {
         console.error("Supabase connection test failed:", err);

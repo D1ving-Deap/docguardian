@@ -56,9 +56,12 @@ const WaitlistSignupSection: React.FC = () => {
       }
       
       // Insert the email hash into the waitlist
-      const { error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await supabase
         .from('Gmail Waitlist')
-        .insert({ 'User Email': emailHash });
+        .insert({ 'User Email': emailHash })
+        .select();
+      
+      console.log("Insert response:", { insertData, insertError });
       
       if (insertError) {
         console.error("Error adding to waitlist:", insertError);
