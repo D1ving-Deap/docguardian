@@ -44,33 +44,51 @@ const MetadataDetection: React.FC = () => {
       // For this demo, we'll simulate metadata extraction with a timeout
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Simulate metadata extraction with example data
+      // Generate metadata based on filename to simulate different results
+      const redFlagWords = ['edited', 'modified', 'fake', 'test'];
+      const hasRedFlag = redFlagWords.some(word => file.name.toLowerCase().includes(word));
+      
+      // Simulate metadata extraction with dynamic data
       const demoMetadata: MetadataItem[] = [
         {
           name: "Producer",
-          value: "Adobe Acrobat Pro DC 22.001.20085",
-          severity: "green",
-          explanation: "Created with official document software - typically legitimate"
+          value: hasRedFlag ? "Adobe Photoshop CC 24.0" : "Adobe Acrobat Pro DC 22.001.20085",
+          severity: hasRedFlag ? "red" : "green",
+          explanation: hasRedFlag 
+            ? "Created with image editing software - high risk of tampering"
+            : "Created with official document software - typically legitimate"
         },
         {
           name: "CreationDate",
-          value: "2024-04-15T10:23:42Z",
+          value: new Date().toISOString().split('T')[0],
           severity: "neutral",
           explanation: "Recent creation date matching the document context"
         },
         {
           name: "ModDate",
-          value: "2024-04-16T09:18:27Z",
-          severity: "yellow",
-          explanation: "Document was modified after creation - may require verification"
+          value: hasRedFlag 
+            ? new Date(Date.now() - 3600000).toISOString().split('T')[0]
+            : new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0],
+          severity: hasRedFlag ? "yellow" : "green",
+          explanation: hasRedFlag
+            ? "Document was modified very recently - may require verification"
+            : "Modification date is consistent with expected timeline"
         },
         {
           name: "Author",
-          value: file.name.includes("sample") ? "Unknown" : "Finance Department",
-          severity: file.name.includes("sample") ? "red" : "green",
-          explanation: file.name.includes("sample") 
+          value: hasRedFlag ? "Unknown" : "Finance Department",
+          severity: hasRedFlag ? "red" : "green",
+          explanation: hasRedFlag 
             ? "Missing author information is suspicious for official documents"
             : "Specific department information increases credibility"
+        },
+        {
+          name: "Keywords",
+          value: hasRedFlag ? "" : "official, verified, 2024",
+          severity: hasRedFlag ? "yellow" : "green",
+          explanation: hasRedFlag 
+            ? "Missing keywords may indicate non-standard document creation"
+            : "Keywords match expected document type"
         }
       ];
       
@@ -242,7 +260,10 @@ const MetadataDetection: React.FC = () => {
                 
                 {file && !analysisComplete && (
                   <div className="text-foreground/60">
-                    <div className="h-12 w-12 rounded-full border-4 border-t-primary border-primary/20 animate-spin mx-auto mb-3"></div>
+                    <div className={cn(
+                      "h-12 w-12 rounded-full border-4 border-t-primary border-primary/20 mx-auto mb-3",
+                      isLoading && "animate-spin"
+                    )}></div>
                     <p>{isLoading ? "Analyzing document..." : "Ready to analyze"}</p>
                     <p className="text-xs mt-1">{file.name}</p>
                   </div>
