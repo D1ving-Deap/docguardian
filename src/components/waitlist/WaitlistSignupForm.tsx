@@ -33,12 +33,15 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
     setIsLoading(true);
     
     try {
+      // Generate a numeric hash from the email since the DB column expects a number
+      const emailHash = generateNumericHash(email);
+      console.log("Generated hash for email:", emailHash);
       
       // Check if email already exists in waitlist
       const { data: existingEmails, error: selectError } = await supabase
         .from('Gmail Waitlist')
         .select()
-        .eq('User Email', email);
+        .eq('User Email', emailHash);
       
       if (selectError) {
         console.error("Error checking waitlist:", selectError);
@@ -58,7 +61,7 @@ const WaitlistSignupForm: React.FC<WaitlistSignupFormProps> = ({ className }) =>
       // Insert the email hash into the waitlist
       const { data: insertData, error: insertError } = await supabase
         .from('Gmail Waitlist')
-        .insert({ 'User Email': email })
+        .insert({ 'User Email': emailHash })
         .select();
       
       console.log("Insert response:", { insertData, insertError });
