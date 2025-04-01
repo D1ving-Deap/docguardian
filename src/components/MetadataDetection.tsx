@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Upload, AlertCircle, AlertTriangle, CheckCircle, XCircle, FileCheck, Info, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -147,11 +148,162 @@ const MetadataDetection: React.FC = () => {
     }
   };
 
-  // ... UI JSX remains unchanged
-
   return (
-    // render the same UI as before
-    <div>Component UI Here</div>
+    <ScrollReveal>
+      <section id="document-verification" className="py-16 bg-slate-50 dark:bg-slate-900">
+        <div className="container px-4 md:px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Document Verification</h2>
+            <p className="mt-4 text-muted-foreground md:text-xl">
+              Upload a PDF document to verify its authenticity through metadata analysis.
+            </p>
+          </div>
+
+          <Card className="max-w-3xl mx-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-6 w-6 text-primary" />
+                Document Metadata Analysis
+              </CardTitle>
+              <CardDescription>
+                Upload a PDF file to analyze its metadata for signs of tampering or fraud.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <label
+                    htmlFor="pdf-upload"
+                    className="flex-1 cursor-pointer bg-muted rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 px-6 py-8 flex flex-col items-center justify-center text-center transition-colors"
+                  >
+                    <Upload className="h-8 w-8 mb-4 text-muted-foreground" />
+                    <h3 className="font-medium mb-1">Click to upload PDF</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {file ? file.name : "PDF files only (max 10MB)"}
+                    </p>
+                    <input
+                      id="pdf-upload"
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                  </label>
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!file || isLoading}
+                    className="sm:self-end"
+                  >
+                    {isLoading ? (
+                      <>Analyzing...</>
+                    ) : (
+                      <>
+                        <FileCheck className="mr-1" /> Analyze Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {isLoading && (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-pulse text-center">
+                      <p className="text-muted-foreground">Analyzing document metadata...</p>
+                    </div>
+                  </div>
+                )}
+
+                {analysisComplete && metadata.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Analysis Results</h3>
+                    
+                    {metadata.filter(item => item.severity === "red").length > 0 && (
+                      <Alert variant="destructive" className="border-red-600">
+                        <AlertCircle className="h-5 w-5" />
+                        <AlertTitle>Potential fraud detected</AlertTitle>
+                        <AlertDescription>
+                          This document contains metadata that suggests it may have been tampered with or fraudulently created.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {metadata.filter(item => item.severity === "yellow").length > 0 && 
+                     metadata.filter(item => item.severity === "red").length === 0 && (
+                      <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-900/20">
+                        <AlertTriangle className="h-5 w-5 text-amber-500" />
+                        <AlertTitle className="text-amber-600 dark:text-amber-400">Suspicious elements found</AlertTitle>
+                        <AlertDescription className="text-amber-700 dark:text-amber-300">
+                          Some metadata elements require additional verification. Proceed with caution.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {metadata.filter(item => item.severity === "red").length === 0 && 
+                     metadata.filter(item => item.severity === "yellow").length === 0 && (
+                      <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20">
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        <AlertTitle className="text-green-600 dark:text-green-400">Document appears legitimate</AlertTitle>
+                        <AlertDescription className="text-green-700 dark:text-green-300">
+                          No suspicious metadata was detected in this document.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-1/4">Property</TableHead>
+                          <TableHead className="w-1/4">Value</TableHead>
+                          <TableHead className="w-1/6">Risk Level</TableHead>
+                          <TableHead>Analysis</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {metadata.map((item, index) => (
+                          <TableRow key={index} className={cn(
+                            item.severity === "red" && "bg-red-50 dark:bg-red-900/20",
+                            item.severity === "yellow" && "bg-amber-50 dark:bg-amber-900/20",
+                            item.severity === "green" && "bg-green-50 dark:bg-green-900/20"
+                          )}>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell className="font-mono text-xs break-all">{item.value}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                {getSeverityIcon(item.severity)}
+                                {getSeverityBadge(item.severity)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">{item.explanation}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex flex-col sm:flex-row justify-between border-t pt-6">
+              <div className="text-sm text-muted-foreground mb-4 sm:mb-0">
+                <p>Disclaimer: This analysis is algorithmic and should be verified by an expert for critical documents.</p>
+              </div>
+              {analysisComplete && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFile(null);
+                    setMetadata([]);
+                    setAnalysisComplete(false);
+                  }}
+                >
+                  <XCircle className="mr-1 h-4 w-4" /> Clear Results
+                </Button>
+              )}
+            </CardFooter>
+          </Card>
+        </div>
+      </section>
+    </ScrollReveal>
   );
 };
 
