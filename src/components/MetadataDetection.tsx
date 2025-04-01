@@ -4,6 +4,7 @@ import { Upload, AlertCircle, AlertTriangle, CheckCircle, XCircle, FileCheck, In
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import ScrollReveal from "./ScrollReveal";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -40,64 +41,71 @@ const MetadataDetection: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would use a PDF parsing library
-      // For this demo, we'll simulate metadata extraction with a timeout
+      // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Generate metadata based on filename to simulate different results
-      const redFlagWords = ['edited', 'modified', 'fake', 'test'];
-      const hasRedFlag = redFlagWords.some(word => file.name.toLowerCase().includes(word));
+      // In a production environment, this is where you would use a PDF parsing library
+      // like pdf.js, pdf-parse, or a backend API to extract real metadata
+      // For this demo, we're showing a simulation with placeholder data
       
-      // Simulate metadata extraction with dynamic data
-      const demoMetadata: MetadataItem[] = [
+      // Example metadata items that would be extracted from a real PDF
+      const simulatedMetadata: MetadataItem[] = [
         {
           name: "Producer",
-          value: hasRedFlag ? "Adobe Photoshop CC 24.0" : "Adobe Acrobat Pro DC 22.001.20085",
-          severity: hasRedFlag ? "red" : "green",
-          explanation: hasRedFlag 
-            ? "Created with image editing software - high risk of tampering"
-            : "Created with official document software - typically legitimate"
+          value: "Adobe Acrobat Pro DC 22.001.20085", 
+          severity: "green",
+          explanation: "Created with official document software - typically legitimate"
         },
         {
           name: "CreationDate",
           value: new Date().toISOString().split('T')[0],
           severity: "neutral",
-          explanation: "Recent creation date matching the document context"
+          explanation: "Creation date matches expected timeline"
         },
         {
           name: "ModDate",
-          value: hasRedFlag 
-            ? new Date(Date.now() - 3600000).toISOString().split('T')[0]
-            : new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0],
-          severity: hasRedFlag ? "yellow" : "green",
-          explanation: hasRedFlag
-            ? "Document was modified very recently - may require verification"
-            : "Modification date is consistent with expected timeline"
+          value: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
+          severity: "neutral",
+          explanation: "Last modified 2 days ago - reasonable for recent documents"
         },
         {
           name: "Author",
-          value: hasRedFlag ? "Unknown" : "Finance Department",
-          severity: hasRedFlag ? "red" : "green",
-          explanation: hasRedFlag 
-            ? "Missing author information is suspicious for official documents"
-            : "Specific department information increases credibility"
+          value: "Financial Authority",
+          severity: "green",
+          explanation: "Specific institutional author increases document credibility"
+        },
+        {
+          name: "Title",
+          value: file.name.replace('.pdf', ''),
+          severity: "neutral",
+          explanation: "Document title matches filename"
+        },
+        {
+          name: "Subject",
+          value: "Official Documentation",
+          severity: "green",
+          explanation: "Subject field properly completed with relevant information"
         },
         {
           name: "Keywords",
-          value: hasRedFlag ? "" : "official, verified, 2024",
-          severity: hasRedFlag ? "yellow" : "green",
-          explanation: hasRedFlag 
-            ? "Missing keywords may indicate non-standard document creation"
-            : "Keywords match expected document type"
+          value: "official, verified, 2024",
+          severity: "green",
+          explanation: "Keywords match expected document type"
+        },
+        {
+          name: "PDF Version",
+          value: "1.7",
+          severity: "neutral",
+          explanation: "Standard PDF version, no concerns"
         }
       ];
       
-      setMetadata(demoMetadata);
+      setMetadata(simulatedMetadata);
       setAnalysisComplete(true);
       
       // Count issues by severity
-      const redFlags = demoMetadata.filter(item => item.severity === "red").length;
-      const yellowFlags = demoMetadata.filter(item => item.severity === "yellow").length;
+      const redFlags = simulatedMetadata.filter(item => item.severity === "red").length;
+      const yellowFlags = simulatedMetadata.filter(item => item.severity === "yellow").length;
       
       if (redFlags > 0) {
         toast.error(`${redFlags} critical issues detected in document metadata`, {
@@ -183,6 +191,15 @@ const MetadataDetection: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="pt-6">
+          <Alert className="mb-6 bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertTitle>Demonstration Mode</AlertTitle>
+            <AlertDescription className="text-xs text-blue-700">
+              This is a simulation of metadata extraction. In a production environment, this would use 
+              a PDF parsing library to extract and analyze real document metadata.
+            </AlertDescription>
+          </Alert>
+          
           <div className="grid md:grid-cols-5 gap-6">
             <div className="md:col-span-2 space-y-4">
               <div className="rounded-lg border-2 border-dashed border-primary/20 p-6 text-center">
