@@ -4,6 +4,7 @@ import { Upload, Sparkles, AlertTriangle, FileWarning, FileCheck, CheckCircle, U
 import ScrollReveal from "./ScrollReveal";
 import AnimatedText from "./AnimatedText";
 import { Button } from "@/components/ui/button";
+import MetadataDetection from "./MetadataDetection";
 
 const HowItWorks: React.FC = () => {
   const steps = [
@@ -152,6 +153,23 @@ const HowItWorks: React.FC = () => {
             ))}
           </div>
         </div>
+        
+        {/* Add the new Metadata Detection component */}
+        <ScrollReveal className="mt-20">
+          <div className="text-center mb-12">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6">
+              Advanced Features
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">
+              Document <span className="text-primary">Metadata</span> Verification
+            </h2>
+            <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
+              Detect fraudulent documents by analyzing metadata for suspicious patterns and inconsistencies.
+            </p>
+          </div>
+          
+          <MetadataDetection />
+        </ScrollReveal>
         
         {/* Broker Dashboard Preview */}
         <ScrollReveal className="mt-16" delay={200}>
