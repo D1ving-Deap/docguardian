@@ -51,7 +51,7 @@ const MetadataDetection: React.FC = () => {
       const author = pdfDoc.getAuthor() || "Unknown";
       const title = pdfDoc.getTitle() || "Untitled";
       const subject = pdfDoc.getSubject() || "Unknown";
-      const keywords = pdfDoc.getKeywords()?.join(", ") || "None";
+      const keywords = pdfDoc.getKeywords() || "None"; // Fixed: getKeywords returns a string, not an array
 
       const now = new Date();
       const simulatedMetadata: MetadataItem[] = [
