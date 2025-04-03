@@ -1,4 +1,3 @@
-
 import React from "react";
 import ScrollReveal from "./ScrollReveal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -6,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts";
-import { CheckCircle, Clock, AlertTriangle, Search, AlertCircle, FileCheck, CloudCheck, ShieldAlert, Users } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, Search, AlertCircle, FileCheck, Cloud, ShieldAlert, Users } from "lucide-react";
 
 const mockBrokerData = [
   { 
@@ -81,7 +80,6 @@ const WorkflowDashboard: React.FC = () => {
               <TabsTrigger value="fraud">Fraud Detection</TabsTrigger>
             </TabsList>
             
-            {/* Overview Tab */}
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
@@ -163,7 +161,6 @@ const WorkflowDashboard: React.FC = () => {
               </div>
             </TabsContent>
             
-            {/* Brokers Tab */}
             <TabsContent value="brokers">
               <Card>
                 <CardHeader>
@@ -213,7 +210,6 @@ const WorkflowDashboard: React.FC = () => {
               </Card>
             </TabsContent>
             
-            {/* Documents Tab */}
             <TabsContent value="documents">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
@@ -261,7 +257,7 @@ const WorkflowDashboard: React.FC = () => {
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
                       <CardTitle>Cloud Storage Access</CardTitle>
-                      <CloudCheck className="h-5 w-5 text-primary" />
+                      <Cloud className="h-5 w-5 text-primary" />
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -300,7 +296,6 @@ const WorkflowDashboard: React.FC = () => {
               </div>
             </TabsContent>
             
-            {/* Fraud Detection Tab */}
             <TabsContent value="fraud">
               <Card>
                 <CardHeader>
