@@ -1,23 +1,16 @@
-
 import React from "react";
 import ScrollReveal from "./ScrollReveal";
 import Benefits from "./waitlist/Benefits";
 import WaitlistSignupSection from "./waitlist/WaitlistSignupSection";
-
 const WaitlistForm: React.FC = () => {
-  return (
-    <section id="waitlist" className="section-padding bg-gradient-to-b from-secondary to-white relative">
+  return <section id="waitlist" className="section-padding bg-gradient-to-b from-secondary to-white relative">
       <div className="section-container">
         <ScrollReveal className="text-center mb-12">
           <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6">
             Limited Spots Available
           </span>
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Join the Pioneers in Mortgage Fraud Protection
-          </h2>
-          <p className="text-lg text-foreground/80 max-w-2xl mx-auto">
-            We're creating the future of mortgage verification, and we want you to be part of it.
-          </p>
+          
+          
         </ScrollReveal>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -25,8 +18,6 @@ const WaitlistForm: React.FC = () => {
           <WaitlistSignupSection />
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default WaitlistForm;
