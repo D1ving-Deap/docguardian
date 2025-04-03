@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Upload, AlertCircle, AlertTriangle, CheckCircle, XCircle, FileCheck, Info, Shield, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -147,7 +146,7 @@ const MetadataDetection: React.FC = () => {
           creationDate.getMonth() === modificationDate.getMonth() &&
           creationDate.getDate() === modificationDate.getDate();
 
-        if (!isSameDay) {
+        if (!creationDate || !isSameDay) {
           timelineEvents.push({
             date: modificationDate,
             label: "Document Modified",
@@ -162,12 +161,14 @@ const MetadataDetection: React.FC = () => {
           const timeDiff = Math.abs(modificationDate.getTime() - creationDate.getTime());
           const diffHours = Math.round(timeDiff / (1000 * 60 * 60) * 10) / 10; // Round to 1 decimal
           
-          timelineEvents.push({
-            date: modificationDate,
-            label: "Same-day Modification",
-            description: `Modified ${diffHours} hours after creation`,
-            type: "modification"
-          });
+          if (diffHours > 0.1) { // Only show if difference is significant (more than 6 minutes)
+            timelineEvents.push({
+              date: modificationDate,
+              label: "Same-day Modification",
+              description: `Modified ${diffHours} hours after creation`,
+              type: "modification"
+            });
+          }
         }
       }
 
