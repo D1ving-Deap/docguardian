@@ -1,15 +1,12 @@
-
 import React from "react";
 import { Shield, FileCheck, FileBarChart } from "lucide-react";
 import ScrollReveal from "./ScrollReveal";
 import MortgageDashboard from "./workflow/MortgageDashboard";
-
 const HowItWorks: React.FC = () => {
-  return (
-    <section id="how-it-works" className="py-20 bg-gray-50">
+  return <section id="how-it-works" className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
         <ScrollReveal>
-          <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6">
+          <span className="inline-block py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6 px-[11px] text-center mx-0">
             The Demo
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
@@ -65,8 +62,6 @@ const HowItWorks: React.FC = () => {
           </div>
         </ScrollReveal>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default HowItWorks;
