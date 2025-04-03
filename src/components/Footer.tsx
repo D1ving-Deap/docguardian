@@ -13,7 +13,7 @@ const Footer: React.FC = () => {
             </span>
           </div>
           
-          <div className="flex space-x-6 mb-6">
+          <div className="flex flex-col md:flex-row md:space-x-6 items-center mb-6">
             <a href="#" className="text-sm text-foreground/60 hover:text-primary transition-colors animated-underline py-1">
               Privacy
             </a>
@@ -26,6 +26,9 @@ const Footer: React.FC = () => {
           </div>
           
           <div className="text-center">
+            <a href="mailto:contact@verify-flow.com" className="text-sm text-primary hover:text-primary/80 transition-colors mb-4 inline-block">
+              contact@verify-flow.com
+            </a>
             <p className="text-sm text-foreground/60">
               Built in Canada, for Canada. 🇨🇦
             </p>
