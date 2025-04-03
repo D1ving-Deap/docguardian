@@ -1,11 +1,10 @@
-
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Users, FileCheck, CloudCheck, AlertTriangle, BarChart, 
+  Users, FileCheck, Cloud, AlertTriangle, BarChart, 
   UserCheck, Clock, CheckCircle, XCircle, AlertCircle
 } from "lucide-react";
 
@@ -181,7 +180,7 @@ const MortgageDashboard: React.FC = () => {
             <span>Applications</span>
           </TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-2">
-            <CloudCheck className="w-4 h-4" />
+            <Cloud className="w-4 h-4" />
             <span>Documents</span>
           </TabsTrigger>
           <TabsTrigger value="fraud" className="flex items-center gap-2">
@@ -299,7 +298,7 @@ const MortgageDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CloudCheck className="w-5 h-5" />
+                <Cloud className="w-5 h-5" />
                 Document Processing Status
               </CardTitle>
               <CardDescription>
