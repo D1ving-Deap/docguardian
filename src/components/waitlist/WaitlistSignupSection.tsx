@@ -71,7 +71,7 @@ const WaitlistSignupSection: React.FC = () => {
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-border/30">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-semibold mb-3">Join the Waitlist</h3>
-          <p className="text-slate-50">We're creating the future of mortgage verification, and we want you to be part of it.</p>
+          <p className="text-blue-500">We're creating the future of mortgage verification, and we want you to be part of it.</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
