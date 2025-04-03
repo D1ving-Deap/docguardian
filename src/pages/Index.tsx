@@ -23,10 +23,10 @@ const Index: React.FC = () => {
       <NavBar />
       <main>
         <HeroSection />
+        <MetadataDetection />
         <PainPoints />
         <Features />
         <HowItWorks />
-        <MetadataDetection />
         <FeatureShowcase />
         <WaitlistForm />
       </main>
