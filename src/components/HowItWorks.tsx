@@ -12,6 +12,9 @@ const HowItWorks: React.FC = () => {
           <ProcessFlow />
         </ScrollReveal>
 
+        {/* Adding extra margin/padding here to create more space */}
+        <div className="mt-24"></div>
+
         <ScrollReveal>
           <div className="flex justify-center">
             <span className="inline-block py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6 px-[11px] text-center">
