@@ -24,9 +24,9 @@ const Index: React.FC = () => {
       <main>
         <HeroSection />
         <PainPoints />
-        <MetadataDetection />
         <Features />
         <HowItWorks />
+        <MetadataDetection />
         <FeatureShowcase />
         <WaitlistForm />
       </main>
