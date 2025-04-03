@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Upload, Sparkles, AlertTriangle, FileCheck } from "lucide-react";
+import { Upload, Sparkles, AlertTriangle, FileCheck, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ProcessFlow: React.FC = () => {
@@ -94,6 +94,13 @@ const ProcessFlow: React.FC = () => {
               </div>
             </div>
 
+            {/* Arrow Down 1 */}
+            <div className="relative z-10 -mt-16 mb-8">
+              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-100 animate-bounce">
+                <ChevronDown className="text-primary w-6 h-6" />
+              </div>
+            </div>
+
             {/* Step 2: Analysis */}
             <div className="relative z-10 mb-24">
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 border-2 border-blue-100">
@@ -105,6 +112,13 @@ const ProcessFlow: React.FC = () => {
                   Our AI scans for inconsistencies, forgery signs, and cross-
                   references data points to spot fraud patterns.
                 </p>
+              </div>
+            </div>
+
+            {/* Arrow Down 2 */}
+            <div className="relative z-10 -mt-16 mb-8">
+              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-100 animate-bounce">
+                <ChevronDown className="text-primary w-6 h-6" />
               </div>
             </div>
 
@@ -129,6 +143,13 @@ const ProcessFlow: React.FC = () => {
                   <span>Previous year:</span>
                   <span className="font-medium">$68,200</span>
                 </div>
+              </div>
+            </div>
+
+            {/* Arrow Down 3 */}
+            <div className="relative z-10 -mt-16 mb-8">
+              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-100 animate-bounce">
+                <ChevronDown className="text-primary w-6 h-6" />
               </div>
             </div>
 
