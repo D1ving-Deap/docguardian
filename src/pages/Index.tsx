@@ -3,7 +3,6 @@ import React, { useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import HeroSection from "@/components/HeroSection";
 import PainPoints from "@/components/PainPoints";
-import MetadataDetection from "@/components/MetadataDetection";
 import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
 import FeatureShowcase from "@/components/FeatureShowcase";
@@ -22,7 +21,6 @@ const Index: React.FC = () => {
       <main>
         <HeroSection />
         <PainPoints />
-        <MetadataDetection />
         <Features />
         <HowItWorks />
         <FeatureShowcase />
