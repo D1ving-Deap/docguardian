@@ -9,8 +9,11 @@ const HowItWorks: React.FC = () => {
     <section id="how-it-works" className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
         <ScrollReveal>
+          <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6">
+            The Demo
+          </span>
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
-            Protecting Your Business At Every Step
+            Protecting Your Business At <span className="text-primary">Every Step</span>
           </h2>
           <p className="text-lg text-center text-gray-600 mb-12 max-w-3xl mx-auto">
             Our comprehensive document verification platform helps you manage your mortgage application workflow securely and efficiently.
