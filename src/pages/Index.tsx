@@ -8,6 +8,9 @@ import HowItWorks from "@/components/HowItWorks";
 import FeatureShowcase from "@/components/FeatureShowcase";
 import WaitlistForm from "@/components/WaitlistForm";
 import Footer from "@/components/Footer";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import MetadataDetection from "@/components/MetadataDetection";
 
 const Index: React.FC = () => {
   useEffect(() => {
@@ -21,6 +24,7 @@ const Index: React.FC = () => {
       <main>
         <HeroSection />
         <PainPoints />
+        <MetadataDetection />
         <Features />
         <HowItWorks />
         <FeatureShowcase />
