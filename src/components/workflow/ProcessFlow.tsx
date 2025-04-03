@@ -1,7 +1,9 @@
 
 import React from "react";
-import { Upload, Sparkles, AlertTriangle, FileCheck, ChevronDown } from "lucide-react";
+import { Upload, Sparkles, AlertTriangle, FileCheck, ChevronDown, ArrowDownCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 const ProcessFlow: React.FC = () => {
   return (
@@ -21,152 +23,168 @@ const ProcessFlow: React.FC = () => {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
-        <div className="space-y-16">
-          {/* Upload Documents */}
-          <div className="relative">
-            <h3 className="text-xl md:text-2xl font-bold mb-3">Upload Documents</h3>
-            <p className="text-gray-600">
-              Drag-and-drop client documents directly into VerifyFlow or 
-              connect your existing document management system.
-            </p>
-            <div className="mt-4">
-              <div className="flex items-center">
-                <Sparkles className="text-primary w-5 h-5 mr-2" />
-                <span className="text-sm font-medium">AI Processing</span>
+      <div className="grid grid-cols-1 gap-8 mb-16">
+        {/* Step 1: Upload Documents */}
+        <div className="relative">
+          <Card className="overflow-visible">
+            <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row items-start">
+                <div className="md:w-1/4 bg-blue-50 p-6 flex flex-col items-center justify-center rounded-tl-lg rounded-bl-lg">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <Upload className="text-primary w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-center">1. Upload Documents</h3>
+                </div>
+                
+                <div className="p-6 md:w-3/4">
+                  <p className="text-gray-700 mb-6">
+                    Users can drag-and-drop documents into VerifyFlow or connect their current document system.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Sparkles className="text-primary w-5 h-5 mr-2" />
+                        <span className="text-sm font-medium">AI Processing</span>
+                      </div>
+                      <span className="text-sm text-gray-500">75%</span>
+                    </div>
+                    <Progress value={75} className="h-2" />
+                  </div>
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                <div 
-                  className="bg-primary h-2.5 rounded-full" 
-                  style={{ width: "75%" }}
-                />
-              </div>
-              <div className="text-right text-sm text-gray-500 mt-1">75%</div>
-            </div>
-          </div>
-
-          {/* Get Red Flag Alerts */}
-          <div className="relative">
-            <h3 className="text-xl md:text-2xl font-bold mb-3">Get Red Flag Alerts</h3>
-            <p className="text-gray-600">
-              Receive instant notifications about suspicious documents with
-              specific details about the issues found.
-            </p>
-          </div>
-
-          {/* Verification Complete */}
-          <div className="relative">
-            <h3 className="text-xl md:text-2xl font-bold mb-3 flex items-center">
-              <FileCheck className="w-6 h-6 text-green-500 mr-2" />
-              Verification Complete
-            </h3>
-            <ul className="space-y-2">
-              <li className="flex items-center">
-                <span className="w-4 h-4 rounded-full bg-green-500 mr-2"></span>
-                <span>6 documents verified</span>
-              </li>
-              <li className="flex items-center">
-                <span className="w-4 h-4 rounded-full bg-yellow-500 mr-2"></span>
-                <span>2 warnings addressed</span>
-              </li>
-              <li className="flex items-center">
-                <span className="w-4 h-4 rounded-full bg-red-500 mr-2"></span>
-                <span>1 red flag resolved</span>
-              </li>
-            </ul>
+            </CardContent>
+          </Card>
+          
+          {/* Arrow Down */}
+          <div className="flex justify-center my-4">
+            <ArrowDownCircle className="text-primary animate-bounce w-10 h-10" />
           </div>
         </div>
-
+        
+        {/* Step 2: AI Analysis */}
         <div className="relative">
-          <div className="flex flex-col items-center">
-            {/* Flow Line */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-0.5 bg-gray-100"></div>
-
-            {/* Step 1: Upload */}
-            <div className="relative z-10 mb-24">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 border-2 border-blue-100">
-                <Upload className="text-primary w-8 h-8" />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-5 w-64 ml-6">
-                <h4 className="font-bold mb-2">Document Upload</h4>
-                <div className="w-full h-3 bg-gray-200 rounded-full mb-1.5"></div>
-                <div className="w-3/4 h-3 bg-gray-200 rounded-full"></div>
-              </div>
-            </div>
-
-            {/* Arrow Down 1 */}
-            <div className="relative z-10 -mt-16 mb-8">
-              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-100 animate-bounce">
-                <ChevronDown className="text-primary w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Step 2: Analysis */}
-            <div className="relative z-10 mb-24">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 border-2 border-blue-100">
-                <Sparkles className="text-primary w-8 h-8" />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-5 w-64 ml-6">
-                <h4 className="font-bold mb-2">AI Analysis</h4>
-                <p className="text-sm text-gray-600">
-                  Our AI scans for inconsistencies, forgery signs, and cross-
-                  references data points to spot fraud patterns.
-                </p>
-              </div>
-            </div>
-
-            {/* Arrow Down 2 */}
-            <div className="relative z-10 -mt-16 mb-8">
-              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-100 animate-bounce">
-                <ChevronDown className="text-primary w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Step 3: Alert */}
-            <div className="relative z-10 mb-24">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 border-2 border-blue-100">
-                <AlertTriangle className="text-yellow-500 w-8 h-8" />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-5 w-64 ml-6">
-                <div className="flex items-center mb-2">
-                  <AlertTriangle className="text-red-500 w-4 h-4 mr-2" />
-                  <h4 className="font-bold text-red-500">Red Flag Alert</h4>
+          <Card className="overflow-visible">
+            <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row items-start">
+                <div className="md:w-1/4 bg-blue-50 p-6 flex flex-col items-center justify-center rounded-tl-lg rounded-bl-lg">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <Sparkles className="text-primary w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-center">2. AI Analysis</h3>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">
-                  Notice of Assessment (2023)
-                </p>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Income declared:</span>
-                  <span className="font-medium text-red-500">$126,500</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Previous year:</span>
-                  <span className="font-medium">$68,200</span>
+                
+                <div className="p-6 md:w-3/4">
+                  <p className="text-gray-700 mb-6">
+                    The system checks for inconsistencies, signs of forgery, and cross-references data.
+                  </p>
+                  
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center mb-3">
+                      <AlertTriangle className="text-red-500 w-5 h-5 mr-2" />
+                      <h4 className="font-bold text-red-500">Example: Red Flag Alert</h4>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600">
+                        Notice of Assessment (2023)
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white p-3 rounded-md shadow-sm">
+                          <p className="text-xs text-gray-500">Current Income</p>
+                          <p className="font-bold text-red-500">$126,500</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-md shadow-sm">
+                          <p className="text-xs text-gray-500">Previous Year</p>
+                          <p className="font-medium">$68,200</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Arrow Down 3 */}
-            <div className="relative z-10 -mt-16 mb-8">
-              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-100 animate-bounce">
-                <ChevronDown className="text-primary w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Step 4: Report */}
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 border-2 border-blue-100">
-                <FileCheck className="text-green-500 w-8 h-8" />
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-5 w-64 ml-6">
-                <h4 className="font-bold mb-2">Generate Compliance Report</h4>
-                <p className="text-sm text-gray-600">
-                  Create one-click verification reports showing your due diligence
-                  for FSRA compliance.
-                </p>
-              </div>
-            </div>
+            </CardContent>
+          </Card>
+          
+          {/* Arrow Down */}
+          <div className="flex justify-center my-4">
+            <ArrowDownCircle className="text-primary animate-bounce w-10 h-10" />
           </div>
+        </div>
+        
+        {/* Step 3: Get Red Flag Alerts */}
+        <div className="relative">
+          <Card className="overflow-visible">
+            <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row items-start">
+                <div className="md:w-1/4 bg-blue-50 p-6 flex flex-col items-center justify-center rounded-tl-lg rounded-bl-lg">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <AlertTriangle className="text-yellow-500 w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-center">3. Get Red Flag Alerts</h3>
+                </div>
+                
+                <div className="p-6 md:w-3/4">
+                  <p className="text-gray-700 mb-6">
+                    Instant notifications are sent for any suspicious documents.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <h4 className="font-semibold">Document Verification Status</h4>
+                    <ul className="space-y-3">
+                      <li className="flex items-center bg-green-50 p-3 rounded-md">
+                        <span className="w-4 h-4 rounded-full bg-green-500 mr-2"></span>
+                        <span className="font-medium">6 documents verified</span>
+                      </li>
+                      <li className="flex items-center bg-yellow-50 p-3 rounded-md">
+                        <span className="w-4 h-4 rounded-full bg-yellow-500 mr-2"></span>
+                        <span className="font-medium">2 warnings addressed</span>
+                      </li>
+                      <li className="flex items-center bg-red-50 p-3 rounded-md">
+                        <span className="w-4 h-4 rounded-full bg-red-500 mr-2"></span>
+                        <span className="font-medium">1 red flag resolved</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Arrow Down */}
+          <div className="flex justify-center my-4">
+            <ArrowDownCircle className="text-primary animate-bounce w-10 h-10" />
+          </div>
+        </div>
+        
+        {/* Step 4: Generate Compliance Report */}
+        <div className="relative">
+          <Card className="overflow-visible">
+            <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row items-start">
+                <div className="md:w-1/4 bg-blue-50 p-6 flex flex-col items-center justify-center rounded-tl-lg rounded-bl-lg">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <FileCheck className="text-green-600 w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-center">4. Generate Compliance Report</h3>
+                </div>
+                
+                <div className="p-6 md:w-3/4">
+                  <p className="text-gray-700">
+                    A one-click report generator helps firms show FSRA compliance, proving due diligence.
+                  </p>
+                  
+                  <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center">
+                    <FileCheck className="text-green-600 w-10 h-10 mr-3" />
+                    <div>
+                      <h4 className="font-bold mb-1">Compliance Report Ready</h4>
+                      <p className="text-sm text-gray-600">All verification steps completed and documented for regulatory review</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
