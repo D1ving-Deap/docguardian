@@ -5,6 +5,7 @@ import FraudAlert from "./hero/FraudAlert";
 import HeroHeader from "./hero/HeroHeader";
 import HeroFeaturesList from "./hero/HeroFeaturesList";
 import ScrollDownButton from "./hero/ScrollDownButton";
+import ScrollReveal from "./ScrollReveal";
 
 const HeroSection: React.FC = () => {
   return (
