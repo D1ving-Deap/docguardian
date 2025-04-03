@@ -10,7 +10,7 @@ import WaitlistForm from "@/components/WaitlistForm";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import MetadataDetection from "@/components/MetadataDetection";
+import WorkflowDashboard from "@/components/WorkflowDashboard";
 
 const Index: React.FC = () => {
   useEffect(() => {
@@ -24,7 +24,7 @@ const Index: React.FC = () => {
       <main>
         <HeroSection />
         <PainPoints />
-        <MetadataDetection />
+        <WorkflowDashboard />
         <Features />
         <HowItWorks />
         <FeatureShowcase />
