@@ -13,7 +13,7 @@ const WaitlistForm: React.FC = () => {
           
         </ScrollReveal>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <Benefits />
           <WaitlistSignupSection />
         </div>
