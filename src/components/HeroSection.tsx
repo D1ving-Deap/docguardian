@@ -1,14 +1,11 @@
-
 import React from "react";
 import WaitlistSignupForm from "./waitlist/WaitlistSignupForm";
 import FraudAlert from "./hero/FraudAlert";
 import HeroHeader from "./hero/HeroHeader";
 import HeroFeaturesList from "./hero/HeroFeaturesList";
 import ScrollDownButton from "./hero/ScrollDownButton";
-
 const HeroSection: React.FC = () => {
-  return (
-    <section className="pt-24 pb-16 px-6 md:px-12 lg:px-20 relative overflow-hidden">
+  return <section className="pt-24 pb-16 px-6 md:px-12 lg:px-20 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
       
       <div className="max-w-7xl mx-auto relative z-10">
@@ -26,12 +23,8 @@ const HeroSection: React.FC = () => {
           </div>
         </div>
         
-        <div className="flex justify-center mt-8">
-          <ScrollDownButton targetId="pain-points" />
-        </div>
+        
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default HeroSection;
