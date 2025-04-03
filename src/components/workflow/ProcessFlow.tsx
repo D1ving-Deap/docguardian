@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Upload, Sparkles, AlertTriangle, FileCheck, ChevronRight } from "lucide-react";
+import { Upload, Sparkles, AlertTriangle, FileCheck, ChevronRight, CloudCog, Shield, FileSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -51,6 +51,22 @@ const ProcessFlow: React.FC = () => {
                     <span className="text-sm text-gray-500">75%</span>
                   </div>
                   <Progress value={75} className="h-2" />
+                  
+                  {/* AI Processing Features */}
+                  <div className="grid grid-cols-3 gap-2 pt-4">
+                    <div className="flex flex-col items-center text-center p-2 border border-gray-100 rounded-lg bg-gray-50">
+                      <FileSearch className="h-5 w-5 text-blue-600 mb-1" />
+                      <span className="text-xs font-medium">Document Reading</span>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-2 border border-gray-100 rounded-lg bg-gray-50">
+                      <CloudCog className="h-5 w-5 text-blue-600 mb-1" />
+                      <span className="text-xs font-medium">Amazon Cloud</span>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-2 border border-gray-100 rounded-lg bg-gray-50">
+                      <Shield className="h-5 w-5 text-blue-600 mb-1" />
+                      <span className="text-xs font-medium">Cybersecurity</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
