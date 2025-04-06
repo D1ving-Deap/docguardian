@@ -37,7 +37,7 @@ const WaitlistForm: React.FC = () => {
                   Secure Your Early Access
                 </h3>
                 <p className="text-center text-muted-foreground text-lg">
-                  Only <span className="text-[#1EAEDB] font-bold text-4xl">50</span> spots remaining for our beta program
+                  Only <span className="text-[#33C3F0] font-bold text-4xl">50</span> spots remaining for our beta program
                 </p>
               </div>
               <div className="p-6">
