@@ -112,12 +112,13 @@ const WaitlistSignupSection: React.FC = () => {
           )}
         </Button>
         
-        <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 mt-3">
+        <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 mt-3 mb-6">
           <Lock className="h-3 w-3" />
           Your information is secure and will never be shared
         </p>
       </form>
       
+      {/* Explicitly render the Testimonial component */}
       <Testimonial />
     </ScrollReveal>
   );
