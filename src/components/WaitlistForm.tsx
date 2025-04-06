@@ -33,11 +33,11 @@ const WaitlistForm: React.FC = () => {
           <div className="lg:col-span-6 flex items-center">
             <div className="w-full bg-white rounded-2xl shadow-lg border border-border/30 overflow-hidden">
               <div className="bg-primary/5 p-8 border-b border-border/30">
-                <h3 className="text-4xl font-bold text-center mb-3">
+                <h3 className="text-5xl font-bold text-center mb-3">
                   Secure Your Early Access
                 </h3>
                 <p className="text-center text-muted-foreground text-lg">
-                  Only <span className="text-[#1EAEDB] font-bold text-3xl">50</span> spots remaining for our beta program
+                  Only <span className="text-[#1EAEDB] font-bold text-4xl">50</span> spots remaining for our beta program
                 </p>
               </div>
               <div className="p-6">
