@@ -15,11 +15,17 @@ const WaitlistForm: React.FC = () => {
           </span>
         </ScrollReveal>
 
-        <MajorFeatures />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mt-16">
-          <Benefits />
-          <WaitlistSignupSection />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-4">
+            <MajorFeatures />
+          </div>
+          
+          <div className="lg:col-span-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+              <Benefits />
+              <WaitlistSignupSection />
+            </div>
+          </div>
         </div>
       </div>
     </section>
