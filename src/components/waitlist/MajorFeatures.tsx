@@ -27,7 +27,7 @@ const MajorFeatures: React.FC = () => {
   ];
 
   return (
-    <div>
+    <div className="h-full">
       <ScrollReveal>
         <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center lg:text-left">
           <span className="text-primary">Major Features</span>
