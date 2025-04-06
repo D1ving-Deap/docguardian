@@ -3,7 +3,6 @@ import React, { useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import HeroSection from "@/components/HeroSection";
 import PainPoints from "@/components/PainPoints";
-import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
 import FeatureShowcase from "@/components/FeatureShowcase";
 import WaitlistForm from "@/components/WaitlistForm";
@@ -25,7 +24,6 @@ const Index: React.FC = () => {
         <HeroSection />
         <MetadataDetection />
         <PainPoints />
-        <Features />
         <HowItWorks />
         <FeatureShowcase />
         <WaitlistForm />
