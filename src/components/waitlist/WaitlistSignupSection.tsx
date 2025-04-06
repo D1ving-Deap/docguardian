@@ -79,48 +79,50 @@ const WaitlistSignupSection: React.FC = () => {
   };
   
   return (
-    <ScrollReveal delay={100}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-foreground/80 mb-2">
-            Email Address
-          </label>
-          <Input 
-            id="email" 
-            type="email" 
-            placeholder="you@example.com" 
-            className="h-12 px-5 text-base focus-visible:ring-primary" 
-            value={email} 
-            onChange={e => setEmail(e.target.value)} 
-            required 
-          />
-        </div>
-        
-        <Button 
-          type="submit" 
-          className={cn(
-            "w-full h-12 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all duration-300 button-hover-effect text-base",
-            isLoading && "opacity-90 pointer-events-none"
-          )} 
-          disabled={isLoading}
-        >
-          {isLoading ? "Processing..." : (
-            <>
-              Join Waitlist Now
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </>
-          )}
-        </Button>
-        
-        <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 mt-3 mb-6">
-          <Lock className="h-3 w-3" />
-          Your information is secure and will never be shared
-        </p>
-      </form>
+    <div>
+      <ScrollReveal delay={100}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-foreground/80 mb-2">
+              Email Address
+            </label>
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="you@example.com" 
+              className="h-12 px-5 text-base focus-visible:ring-primary" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              required 
+            />
+          </div>
+          
+          <Button 
+            type="submit" 
+            className={cn(
+              "w-full h-12 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all duration-300 button-hover-effect text-base",
+              isLoading && "opacity-90 pointer-events-none"
+            )} 
+            disabled={isLoading}
+          >
+            {isLoading ? "Processing..." : (
+              <>
+                Join Waitlist Now
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </>
+            )}
+          </Button>
+          
+          <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1 mt-3 mb-6">
+            <Lock className="h-3 w-3" />
+            Your information is secure and will never be shared
+          </p>
+        </form>
+      </ScrollReveal>
       
-      {/* Explicitly render the Testimonial component */}
+      {/* Render testimonial directly without ScrollReveal wrapper */}
       <Testimonial />
-    </ScrollReveal>
+    </div>
   );
 };
 
