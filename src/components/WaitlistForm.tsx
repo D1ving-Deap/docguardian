@@ -3,6 +3,7 @@ import React from "react";
 import ScrollReveal from "./ScrollReveal";
 import Benefits from "./waitlist/Benefits";
 import WaitlistSignupSection from "./waitlist/WaitlistSignupSection";
+import MajorFeatures from "./waitlist/MajorFeatures";
 
 const WaitlistForm: React.FC = () => {
   return (
@@ -14,7 +15,9 @@ const WaitlistForm: React.FC = () => {
           </span>
         </ScrollReveal>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <MajorFeatures />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mt-16">
           <Benefits />
           <WaitlistSignupSection />
         </div>
