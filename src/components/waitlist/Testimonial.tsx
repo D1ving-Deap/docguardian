@@ -1,8 +1,7 @@
 
 import React from "react";
-import { Quote, Star, Clock, CheckCircle, MessageSquare, User } from "lucide-react";
+import { Quote, Star, MessageSquare } from "lucide-react";
 import ScrollReveal from "../ScrollReveal";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 const Testimonial: React.FC = () => {
   const testimonials = [

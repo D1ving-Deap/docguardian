@@ -4,7 +4,7 @@ import ScrollReveal from "./ScrollReveal";
 import Benefits from "./waitlist/Benefits";
 import WaitlistSignupSection from "./waitlist/WaitlistSignupSection";
 import MajorFeatures from "./waitlist/MajorFeatures";
-import { ArrowRight, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 const WaitlistForm: React.FC = () => {
   return (
