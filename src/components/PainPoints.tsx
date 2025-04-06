@@ -34,8 +34,8 @@ const PainPoints: React.FC = () => {
     {
       icon: <RefreshCw className="h-6 w-6 text-white" />,
       title: "Continuous Monitoring",
-      description: "We flag new issues even after closing. Your protection remains active throughout the mortgage term.",
-      color: "from-primary/80 to-primary/60",
+      description: "We flag suspicious activities even after closing. Your protection remains active throughout the mortgage term.",
+      color: "from-red-600 to-red-500",
     },
     {
       icon: <FileBarChart className="h-6 w-6 text-white" />,
