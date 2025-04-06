@@ -30,7 +30,7 @@ const MajorFeatures: React.FC = () => {
     <div>
       <ScrollReveal>
         <h2 className="text-2xl md:text-3xl font-bold mb-6 text-center lg:text-left">
-          Three <span className="text-primary">Major Features</span>
+          <span className="text-primary">Major Features</span>
         </h2>
       </ScrollReveal>
       
