@@ -1,14 +1,11 @@
-
 import React from "react";
 import ScrollReveal from "./ScrollReveal";
 import Benefits from "./waitlist/Benefits";
 import WaitlistSignupSection from "./waitlist/WaitlistSignupSection";
 import MajorFeatures from "./waitlist/MajorFeatures";
 import { Clock } from "lucide-react";
-
 const WaitlistForm: React.FC = () => {
-  return (
-    <section id="waitlist" className="section-padding bg-gradient-to-b from-secondary/80 to-white relative overflow-hidden">
+  return <section id="waitlist" className="section-padding bg-gradient-to-b from-secondary/80 to-white relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-pattern opacity-5 z-0"></div>
       
       <div className="section-container relative z-10">
@@ -33,11 +30,11 @@ const WaitlistForm: React.FC = () => {
           <div className="lg:col-span-6 flex items-center">
             <div className="w-full bg-white rounded-2xl shadow-lg border border-border/30 overflow-hidden">
               <div className="bg-primary/5 p-8 border-b border-border/30">
-                <h3 className="text-4xl lg:text-5xl font-bold text-center mb-3">
+                <h3 className="text-4xl font-bold text-center mb-3 lg:text-3xl">
                   Secure Your Early Access
                 </h3>
                 <p className="text-center text-muted-foreground text-lg">
-                  Only <span className="text-[#33C3F0] font-bold text-4xl">50</span> spots remaining for our beta program
+                  Only <span className="text-2xl text-gray-600 font-normal">50</span> spots remaining for our beta program
                 </p>
               </div>
               <div className="p-6">
@@ -47,8 +44,6 @@ const WaitlistForm: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default WaitlistForm;
