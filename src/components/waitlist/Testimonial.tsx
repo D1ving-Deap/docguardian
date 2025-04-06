@@ -1,7 +1,8 @@
 
 import React from "react";
-import { Quote, Star, Clock, CheckCircle } from "lucide-react";
+import { Quote, Star, Clock, CheckCircle, MessageSquare, User } from "lucide-react";
 import ScrollReveal from "../ScrollReveal";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 const Testimonial: React.FC = () => {
   const testimonials = [
@@ -28,21 +29,16 @@ const Testimonial: React.FC = () => {
       initials: "DL",
       color: "bg-blue-500/10",
       textColor: "text-blue-500"
-    },
-    {
-      quote: "One-click audit reports have saved us countless hours of preparation. Our last regulatory review was completely painless.",
-      name: "Jennifer R.",
-      title: "Underwriter, Calgary",
-      initials: "JR",
-      color: "bg-amber-500/10",
-      textColor: "text-amber-500"
     }
   ];
 
   return (
     <div className="mt-10 pt-6 border-t border-border/30">
-      <h3 className="font-semibold text-center mb-6 text-lg">What Our Beta Users Are Saying</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <h3 className="font-semibold text-center mb-6 text-lg flex items-center justify-center gap-2">
+        <MessageSquare className="h-5 w-5 text-primary" />
+        What Our Beta Users Are Saying
+      </h3>
+      <div className="grid grid-cols-1 gap-4">
         {testimonials.map((testimonial, index) => (
           <ScrollReveal key={index} delay={index * 100} animation="fade-in-up">
             <div className="bg-secondary/50 p-5 rounded-xl relative h-full">
