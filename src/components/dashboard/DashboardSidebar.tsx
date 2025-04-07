@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Users,
   ClipboardList,
+  Cloud,
 } from "lucide-react";
 
 interface DashboardSidebarProps {
@@ -66,7 +67,7 @@ const DashboardSidebar = ({
     },
     {
       name: "AWS Integration",
-      icon: <Settings className="h-5 w-5" />,
+      icon: <Cloud className="h-5 w-5" />,
       value: "settings",
     },
   ];
