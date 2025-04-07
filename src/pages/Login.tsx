@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const Login = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [loginData, setLoginData] = useState({
     email: "",
@@ -28,6 +30,9 @@ const Login = () => {
     password: "",
     confirmPassword: "",
   });
+
+  // Get the intended destination from location state, if available
+  const from = location.state?.from?.pathname || "/dashboard";
 
   // Parse tab from URL query parameters
   useEffect(() => {
@@ -43,18 +48,37 @@ const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate("/dashboard");
+      // Use a short timeout to ensure state has been fully updated
+      const redirectTimer = setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 100);
+      
+      return () => clearTimeout(redirectTimer);
     }
-  }, [user, navigate]);
+  }, [user, navigate, from]);
+
+  // Clear error message when switching tabs
+  useEffect(() => {
+    setErrorMessage(null);
+  }, [activeTab]);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+    
+    // Form validation
     if (!loginData.email || !loginData.password) {
-      toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
+      setErrorMessage("Please fill in all required fields");
+      return;
+    }
+    
+    if (!validateEmail(loginData.email)) {
+      setErrorMessage("Please enter a valid email address");
       return;
     }
     
@@ -62,9 +86,21 @@ const Login = () => {
     try {
       console.log("Attempting to sign in with:", loginData.email);
       await signIn(loginData.email, loginData.password);
+      toast({
+        title: "Login successful",
+        description: "Redirecting to dashboard...",
+      });
       // Navigation is handled by the useEffect when user state changes
     } catch (error: any) {
       console.error("Login error:", error);
+      // Handle specific error types
+      const errorMessage = getAuthErrorMessage(error);
+      setErrorMessage(errorMessage);
+      toast({
+        title: "Login failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -72,31 +108,37 @@ const Login = () => {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     
+    // Form validation
     if (!registerData.fullName || !registerData.email || !registerData.password || !registerData.confirmPassword) {
-      toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
+      setErrorMessage("Please fill in all required fields");
+      return;
+    }
+    
+    if (!validateEmail(registerData.email)) {
+      setErrorMessage("Please enter a valid email address");
       return;
     }
     
     if (registerData.password !== registerData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive",
-      });
+      setErrorMessage("Passwords do not match");
       return;
     }
 
     if (registerData.password.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive",
-      });
+      setErrorMessage("Password must be at least 6 characters long");
+      return;
+    }
+
+    // Password strength check
+    const hasUpperCase = /[A-Z]/.test(registerData.password);
+    const hasLowerCase = /[a-z]/.test(registerData.password);
+    const hasNumbers = /\d/.test(registerData.password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(registerData.password);
+    
+    if (!(hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar)) {
+      setErrorMessage("Password must contain uppercase, lowercase, numbers, and special characters");
       return;
     }
 
@@ -104,13 +146,57 @@ const Login = () => {
     try {
       console.log("Attempting to sign up with:", registerData.email);
       await signUp(registerData.email, registerData.password, registerData.fullName);
-      // After successful registration, show a toast but don't navigate
-      // The user needs to verify their email first
+      // After successful registration, show a toast and switch to login tab
+      toast({
+        title: "Registration successful",
+        description: "Please check your email to verify your account before logging in.",
+      });
       setActiveTab("login");
+      // Clear registration form
+      setRegisterData({
+        fullName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
     } catch (error: any) {
       console.error("Registration error:", error);
+      const errorMessage = getAuthErrorMessage(error);
+      setErrorMessage(errorMessage);
+      toast({
+        title: "Registration failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to parse authentication errors
+  const getAuthErrorMessage = (error: any): string => {
+    const errorCode = error.code || "";
+    
+    // Handle Firebase-specific error codes
+    switch (errorCode) {
+      case "auth/email-already-in-use":
+        return "This email is already registered. Please log in instead.";
+      case "auth/invalid-email":
+        return "Invalid email address format.";
+      case "auth/user-disabled":
+        return "This account has been disabled. Please contact support.";
+      case "auth/user-not-found":
+        return "No account found with this email. Please register first.";
+      case "auth/wrong-password":
+        return "Incorrect password. Please try again.";
+      case "auth/too-many-requests":
+        return "Too many failed login attempts. Please try again later.";
+      case "auth/weak-password":
+        return "Password is too weak. It must be at least 6 characters.";
+      case "auth/network-request-failed":
+        return "Network error. Please check your connection and try again.";
+      default:
+        return error.message || "An unexpected error occurred. Please try again.";
     }
   };
 
@@ -133,7 +219,9 @@ const Login = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Welcome to VerifyFlow</CardTitle>
           <CardDescription>
-            Log in to access the mortgage verification dashboard
+            {activeTab === "login" 
+              ? "Log in to access the mortgage verification dashboard"
+              : "Create an account to get started with VerifyFlow"}
           </CardDescription>
         </CardHeader>
         
@@ -142,6 +230,14 @@ const Login = () => {
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
           </TabsList>
+          
+          {errorMessage && (
+            <div className="px-6 pt-2">
+              <Alert variant="destructive" className="border-red-500 bg-red-50 text-red-800">
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            </div>
+          )}
           
           <TabsContent value="login">
             <form onSubmit={handleLoginSubmit}>
@@ -155,11 +251,15 @@ const Login = () => {
                     required
                     value={loginData.email}
                     onChange={(e) => setLoginData({...loginData, email: e.target.value})}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="login-password">Password</Label>
+                    <a href="/reset-password" className="text-sm text-primary hover:underline">
+                      Forgot password?
+                    </a>
                   </div>
                   <Input 
                     id="login-password" 
@@ -167,12 +267,20 @@ const Login = () => {
                     required
                     value={loginData.password}
                     onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                    disabled={loading}
                   />
                 </div>
               </CardContent>
               <CardFooter>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Logging in..." : "Log in"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Logging in...
+                    </>
+                  ) : (
+                    "Log in"
+                  )}
                 </Button>
               </CardFooter>
             </form>
@@ -189,6 +297,7 @@ const Login = () => {
                     required
                     value={registerData.fullName}
                     onChange={(e) => setRegisterData({...registerData, fullName: e.target.value})}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -200,6 +309,7 @@ const Login = () => {
                     required
                     value={registerData.email}
                     onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -210,7 +320,11 @@ const Login = () => {
                     required
                     value={registerData.password}
                     onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
+                    disabled={loading}
                   />
+                  <p className="text-xs text-gray-500">
+                    Password must be at least 6 characters with uppercase, lowercase, numbers, and special characters.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm Password</Label>
@@ -220,13 +334,26 @@ const Login = () => {
                     required
                     value={registerData.confirmPassword}
                     onChange={(e) => setRegisterData({...registerData, confirmPassword: e.target.value})}
+                    disabled={loading}
                   />
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex flex-col space-y-4">
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Create account"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    "Create account"
+                  )}
                 </Button>
+                <p className="text-xs text-center text-gray-500">
+                  By creating an account, you agree to our{" "}
+                  <a href="/terms" className="text-primary hover:underline">Terms of Service</a> and{" "}
+                  <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>.
+                </p>
               </CardFooter>
             </form>
           </TabsContent>
