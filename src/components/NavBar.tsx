@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 const NavBar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -45,12 +46,20 @@ const NavBar: React.FC = () => {
             Join Waitlist
           </a>
         </nav>
-        <a
-          href="#waitlist"
-          className="bg-primary text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-primary/90 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
-        >
-          Join Waitlist
-        </a>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/dashboard"
+            className="text-primary hover:text-primary/80 font-medium text-sm transition-colors"
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/login"
+            className="bg-primary text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-primary/90 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+          >
+            Login
+          </Link>
+        </div>
       </div>
     </header>
   );
