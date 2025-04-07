@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
 import { 
   AlertCircle, 
   CheckCircle, 
@@ -32,11 +33,16 @@ import {
   Briefcase, 
   Home, 
   CreditCard,
-  ClipboardList 
+  ClipboardList,
+  X,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle 
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { s3 } from "@/utils/awsStorage";
 
 const ApplicationStageFlow = () => {
   const [currentStage, setCurrentStage] = useState("get-started");
@@ -140,6 +146,215 @@ const ApplicationStageFlow = () => {
   );
 };
 
+// File Upload Component
+interface FileUploadProps {
+  label: string;
+  description?: string;
+  acceptTypes?: string;
+  bucket?: string;
+  folder?: string;
+  onChange?: (fileKey: string | null) => void;
+}
+
+const FileUpload = ({ 
+  label, 
+  description, 
+  acceptTypes = "image/*, application/pdf", 
+  bucket = "user-documents",
+  folder = "",
+  onChange 
+}: FileUploadProps) => {
+  const { toast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedKey, setUploadedKey] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      
+      // Check file size (10MB max)
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Maximum file size is 10MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setFile(selectedFile);
+      
+      // Create preview for images
+      if (selectedFile.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setPreviewUrl(event.target?.result as string);
+        };
+        reader.readAsDataURL(selectedFile);
+      } else {
+        // For PDFs, show an icon instead
+        setPreviewUrl(null);
+      }
+    }
+  };
+  
+  const handleUpload = async () => {
+    if (!file) return;
+    
+    setIsUploading(true);
+    
+    // Check if AWS is connected
+    if (!s3.isAWSConnected()) {
+      toast({
+        title: "AWS not connected",
+        description: "Please connect to AWS in settings first",
+        variant: "destructive"
+      });
+      setIsUploading(false);
+      return;
+    }
+    
+    // Generate key with folder path
+    const key = folder ? `${folder}/${file.name}` : file.name;
+    
+    // Upload to S3
+    const result = await s3.uploadFile(file, bucket, key);
+    
+    if ('error' in result) {
+      toast({
+        title: "Upload failed",
+        description: result.error,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Upload successful",
+        description: "File uploaded successfully"
+      });
+      
+      setUploadedKey(result.key);
+      if (onChange) onChange(result.key);
+    }
+    
+    setIsUploading(false);
+  };
+  
+  const handleRemove = async () => {
+    if (uploadedKey) {
+      // Delete from S3
+      const result = await s3.deleteFile(uploadedKey, bucket);
+      
+      if ('error' in result) {
+        toast({
+          title: "Removal failed",
+          description: result.error,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "File removed",
+          description: "File removed successfully"
+        });
+        
+        setFile(null);
+        setPreviewUrl(null);
+        setUploadedKey(null);
+        if (onChange) onChange(null);
+      }
+    } else {
+      // Just clear the selected file
+      setFile(null);
+      setPreviewUrl(null);
+    }
+  };
+  
+  return (
+    <div className="space-y-2">
+      <div className="font-medium text-sm">{label}</div>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      
+      {!file ? (
+        <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
+          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+          <p className="text-sm text-center text-muted-foreground mb-2">
+            {acceptTypes.includes('image') ? 'PNG, JPG' : ''} 
+            {acceptTypes.includes('image') && acceptTypes.includes('pdf') ? ' or ' : ''}
+            {acceptTypes.includes('pdf') ? 'PDF' : ''} 
+            {' '}up to 10MB
+          </p>
+          <input
+            type="file"
+            accept={acceptTypes}
+            onChange={handleFileChange}
+            className="hidden"
+            id={`file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`}
+          />
+          <label htmlFor={`file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`}>
+            <Button variant="outline" size="sm" className="cursor-pointer" asChild>
+              <span>Choose File</span>
+            </Button>
+          </label>
+        </div>
+      ) : (
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-blue-500" />
+              <span className="font-medium text-sm truncate max-w-[200px]">{file.name}</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRemove}
+              disabled={isUploading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {previewUrl && (
+            <div className="mb-3 flex justify-center">
+              <img 
+                src={previewUrl} 
+                alt="Preview" 
+                className="max-h-32 max-w-full rounded border"
+              />
+            </div>
+          )}
+          
+          {!uploadedKey ? (
+            <Button 
+              onClick={handleUpload} 
+              disabled={isUploading} 
+              className="w-full"
+              size="sm"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload
+                </>
+              )}
+            </Button>
+          ) : (
+            <div className="flex items-center text-green-600 text-sm">
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Uploaded successfully
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Get Started Stage Component
 const getStartedSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
@@ -163,6 +378,8 @@ const GetStartedStage = ({ onComplete }: { onComplete: () => void }) => {
 
   const onSubmit = (data: z.infer<typeof getStartedSchema>) => {
     console.log("Get Started data:", data);
+    // Save to localStorage for persistence
+    localStorage.setItem('application-data-personal', JSON.stringify(data));
     onComplete();
   };
 
@@ -291,6 +508,11 @@ const identitySchema = z.object({
 });
 
 const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [idFrontKey, setIdFrontKey] = useState<string | null>(null);
+  const [idBackKey, setIdBackKey] = useState<string | null>(null);
+  const [addressProofKey, setAddressProofKey] = useState<string | null>(null);
+  
   const form = useForm<z.infer<typeof identitySchema>>({
     resolver: zodResolver(identitySchema),
     defaultValues: {
@@ -304,7 +526,29 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
   });
 
   const onSubmit = (data: z.infer<typeof identitySchema>) => {
+    // Check if required documents are uploaded
+    if (!idFrontKey || !idBackKey || !addressProofKey) {
+      toast({
+        title: "Missing documents",
+        description: "Please upload all required documents",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     console.log("Identity data:", data);
+    console.log("Document keys:", { idFrontKey, idBackKey, addressProofKey });
+    
+    // Save to localStorage for persistence
+    localStorage.setItem('application-data-identity', JSON.stringify({
+      ...data,
+      documents: {
+        idFront: idFrontKey,
+        idBack: idBackKey,
+        addressProof: addressProofKey
+      }
+    }));
+    
     onComplete();
   };
 
@@ -317,6 +561,23 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="rounded-md bg-blue-50 border border-blue-100 p-4 mb-6">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-blue-800 font-medium">AWS S3 Storage</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Your documents will be securely uploaded and stored in Amazon S3.
+                {!s3.isAWSConnected() && (
+                  <span className="font-medium text-amber-600 block mt-1">
+                    Please connect to AWS in settings first to enable document upload.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -432,45 +693,57 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">ID Document (Driver's License or Passport)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
-                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm text-center text-muted-foreground">
-                      Upload front of ID
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-2">
-                      Choose File
-                    </Button>
-                  </div>
+                  <FileUpload 
+                    label="Front of ID"
+                    description="Clear photo of the front of your ID"
+                    acceptTypes="image/*"
+                    bucket="user-documents"
+                    folder="identity"
+                    onChange={setIdFrontKey}
+                  />
                   
-                  <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
-                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm text-center text-muted-foreground">
-                      Upload back of ID
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-2">
-                      Choose File
-                    </Button>
-                  </div>
+                  <FileUpload 
+                    label="Back of ID"
+                    description="Clear photo of the back of your ID"
+                    acceptTypes="image/*"
+                    bucket="user-documents"
+                    folder="identity"
+                    onChange={setIdBackKey}
+                  />
                 </div>
               </div>
               
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">Address Proof (Utility Bill or Bank Statement)</h4>
-                <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
-                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-center text-muted-foreground">
-                    Upload proof of address document
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Choose File
-                  </Button>
-                </div>
+                <FileUpload 
+                  label="Address Proof Document"
+                  description="Recent utility bill or bank statement showing your address"
+                  acceptTypes="image/*, application/pdf"
+                  bucket="user-documents"
+                  folder="identity"
+                  onChange={setAddressProofKey}
+                />
               </div>
             </div>
             
-            <Button type="submit" className="w-full">
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={!s3.isAWSConnected()}
+            >
               Continue to Employment <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
+            
+            {!s3.isAWSConnected() && (
+              <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
+                <div className="flex">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
+                  <p className="text-sm text-amber-800">
+                    AWS connection required. Please connect to AWS in settings to enable document uploads.
+                  </p>
+                </div>
+              </div>
+            )}
           </form>
         </Form>
       </CardContent>
@@ -479,9 +752,37 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
 };
 
 // Placeholder components for the remaining stages
-// These would be implemented similarly to the above components
+// These would be implemented similarly to the above components with document upload functionality
 
 const EmploymentStage = ({ onComplete }: { onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [paystub1Key, setPaystub1Key] = useState<string | null>(null);
+  const [paystub2Key, setPaystub2Key] = useState<string | null>(null);
+  const [employmentLetterKey, setEmploymentLetterKey] = useState<string | null>(null);
+  
+  const handleSubmit = () => {
+    // Check if at least one document is uploaded
+    if (!paystub1Key && !paystub2Key && !employmentLetterKey) {
+      toast({
+        title: "Missing documents",
+        description: "Please upload at least one employment document",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Save document keys to localStorage
+    localStorage.setItem('application-data-employment', JSON.stringify({
+      documents: {
+        paystub1: paystub1Key,
+        paystub2: paystub2Key,
+        employmentLetter: employmentLetterKey
+      }
+    }));
+    
+    onComplete();
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -491,11 +792,63 @@ const EmploymentStage = ({ onComplete }: { onComplete: () => void }) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <p>Employment information form fields would go here...</p>
-          <Button onClick={onComplete} className="w-full">
+        <div className="space-y-6">
+          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <p className="text-sm text-blue-700">
+                Please upload at least one of the following documents to verify your employment and income.
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <FileUpload 
+              label="Pay Stub (Last Month)"
+              description="Recent pay stub showing your income"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="employment"
+              onChange={setPaystub1Key}
+            />
+            
+            <FileUpload 
+              label="Pay Stub (Previous Month)"
+              description="Pay stub from the previous month"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="employment"
+              onChange={setPaystub2Key}
+            />
+            
+            <FileUpload 
+              label="Employment Letter"
+              description="Letter from your employer confirming your position and income"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="employment"
+              onChange={setEmploymentLetterKey}
+            />
+          </div>
+          
+          <Button 
+            onClick={handleSubmit} 
+            className="w-full"
+            disabled={!s3.isAWSConnected()}
+          >
             Continue to Assets <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+          
+          {!s3.isAWSConnected() && (
+            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
+              <div className="flex">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  AWS connection required. Please connect to AWS in settings to enable document uploads.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -503,6 +856,32 @@ const EmploymentStage = ({ onComplete }: { onComplete: () => void }) => {
 };
 
 const AssetsStage = ({ onComplete }: { onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [bankStatementKey, setBankStatementKey] = useState<string | null>(null);
+  const [investmentStatementKey, setInvestmentStatementKey] = useState<string | null>(null);
+  
+  const handleSubmit = () => {
+    // Check if at least one document is uploaded
+    if (!bankStatementKey && !investmentStatementKey) {
+      toast({
+        title: "Missing documents",
+        description: "Please upload at least one financial document",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Save document keys to localStorage
+    localStorage.setItem('application-data-assets', JSON.stringify({
+      documents: {
+        bankStatement: bankStatementKey,
+        investmentStatement: investmentStatementKey
+      }
+    }));
+    
+    onComplete();
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -512,11 +891,54 @@ const AssetsStage = ({ onComplete }: { onComplete: () => void }) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <p>Assets and liabilities form fields would go here...</p>
-          <Button onClick={onComplete} className="w-full">
+        <div className="space-y-6">
+          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <p className="text-sm text-blue-700">
+                Please upload documents showing your financial assets and liabilities.
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <FileUpload 
+              label="Bank Statement"
+              description="Recent bank statement showing your balances"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="assets"
+              onChange={setBankStatementKey}
+            />
+            
+            <FileUpload 
+              label="Investment Statement"
+              description="RRSP, TFSA or other investment account statements"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="assets"
+              onChange={setInvestmentStatementKey}
+            />
+          </div>
+          
+          <Button 
+            onClick={handleSubmit} 
+            className="w-full"
+            disabled={!s3.isAWSConnected()}
+          >
             Continue to Property Info <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+          
+          {!s3.isAWSConnected() && (
+            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
+              <div className="flex">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  AWS connection required. Please connect to AWS in settings to enable document uploads.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -524,6 +946,24 @@ const AssetsStage = ({ onComplete }: { onComplete: () => void }) => {
 };
 
 const PropertyStage = ({ onComplete }: { onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [propertyTaxKey, setPropertyTaxKey] = useState<string | null>(null);
+  const [mortgageStatementKey, setMortgageStatementKey] = useState<string | null>(null);
+  
+  const handleSubmit = () => {
+    // For property, documents might be optional if they don't own property
+    
+    // Save document keys to localStorage
+    localStorage.setItem('application-data-property', JSON.stringify({
+      documents: {
+        propertyTax: propertyTaxKey,
+        mortgageStatement: mortgageStatementKey
+      }
+    }));
+    
+    onComplete();
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -533,11 +973,54 @@ const PropertyStage = ({ onComplete }: { onComplete: () => void }) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <p>Property information form fields would go here...</p>
-          <Button onClick={onComplete} className="w-full">
+        <div className="space-y-6">
+          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <p className="text-sm text-blue-700">
+                If you own property, please upload the following documents. Skip this step if you don't own property.
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <FileUpload 
+              label="Property Tax Bill"
+              description="Most recent property tax assessment"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="property"
+              onChange={setPropertyTaxKey}
+            />
+            
+            <FileUpload 
+              label="Mortgage Statement"
+              description="Recent mortgage statement showing balance and payment"
+              acceptTypes="image/*, application/pdf"
+              bucket="user-documents"
+              folder="property"
+              onChange={setMortgageStatementKey}
+            />
+          </div>
+          
+          <Button 
+            onClick={handleSubmit} 
+            className="w-full"
+            disabled={!s3.isAWSConnected()}
+          >
             Continue to Final Step <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+          
+          {!s3.isAWSConnected() && (
+            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
+              <div className="flex">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  AWS connection required. Please connect to AWS in settings to enable document uploads.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -545,6 +1028,36 @@ const PropertyStage = ({ onComplete }: { onComplete: () => void }) => {
 };
 
 const FinalStage = ({ onComplete }: { onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [consent, setConsent] = useState(false);
+  const [signatureKey, setSignatureKey] = useState<string | null>(null);
+  
+  const handleSubmit = () => {
+    if (!consent) {
+      toast({
+        title: "Consent required",
+        description: "Please agree to the terms to complete your application",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Save document keys to localStorage
+    localStorage.setItem('application-data-final', JSON.stringify({
+      consent,
+      documents: {
+        signature: signatureKey
+      }
+    }));
+    
+    toast({
+      title: "Application Complete",
+      description: "Your mortgage application has been submitted successfully",
+    });
+    
+    onComplete();
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -562,7 +1075,13 @@ const FinalStage = ({ onComplete }: { onComplete: () => void }) => {
               I consent to having my information shared with lenders for the purpose of mortgage application processing.
             </p>
             <div className="flex items-center space-x-2">
-              <input type="checkbox" id="consent" className="rounded" />
+              <input 
+                type="checkbox" 
+                id="consent" 
+                className="rounded"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+              />
               <label htmlFor="consent" className="text-sm font-medium">
                 I agree to the terms and consent to data sharing
               </label>
@@ -571,16 +1090,34 @@ const FinalStage = ({ onComplete }: { onComplete: () => void }) => {
           
           <div className="border rounded-lg p-4">
             <h3 className="font-medium mb-2">Digital Signature</h3>
-            <div className="border-2 border-dashed rounded-lg p-6 h-32 flex items-center justify-center">
-              <p className="text-sm text-center text-muted-foreground">
-                Draw your signature here or click to sign
-              </p>
-            </div>
+            <FileUpload 
+              label="Upload Signature"
+              description="Upload an image of your signature"
+              acceptTypes="image/*"
+              bucket="user-documents"
+              folder="signatures"
+              onChange={setSignatureKey}
+            />
           </div>
           
-          <Button onClick={onComplete} className="w-full">
+          <Button 
+            onClick={handleSubmit} 
+            className="w-full"
+            disabled={!consent || (!signatureKey && s3.isAWSConnected())}
+          >
             Submit Application <CheckCircle className="ml-2 h-4 w-4" />
           </Button>
+          
+          {!s3.isAWSConnected() && (
+            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
+              <div className="flex">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
+                <p className="text-sm text-amber-800">
+                  AWS connection required. Please connect to AWS in settings to enable document uploads.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
