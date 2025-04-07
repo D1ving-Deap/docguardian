@@ -1,9 +1,8 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 
 interface FraudAlert {
   id: string;
@@ -20,29 +19,37 @@ interface FraudAlert {
 }
 
 const FraudAlertsList = () => {
-  const { data: alerts, isLoading, error } = useQuery({
-    queryKey: ['fraud-alerts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fraud_alerts')
-        .select(`
-          *,
-          document:document_id (
-            document_type,
-            application:application_id (
-              client_name
-            )
-          )
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as FraudAlert[];
+  // Mock data until the Supabase schema is properly set up
+  const [alerts, setAlerts] = useState<FraudAlert[]>([
+    {
+      id: "alert-001",
+      document_id: "doc-001",
+      issue: "Metadata inconsistencies detected",
+      severity: "High",
+      created_at: new Date().toISOString(),
+      document: {
+        document_type: "Income Statement",
+        application: {
+          client_name: "Emily Johnson"
+        }
+      }
     },
-  });
-
-  if (isLoading) return <div>Loading alerts...</div>;
-  if (error) return <div>Error loading alerts</div>;
+    {
+      id: "alert-002",
+      document_id: "doc-002",
+      issue: "Potential digital forgery",
+      severity: "Medium",
+      created_at: new Date().toISOString(),
+      document: {
+        document_type: "Property Deed",
+        application: {
+          client_name: "John Smith"
+        }
+      }
+    }
+  ]);
+  
+  const [isLoading, setIsLoading] = useState(false);
 
   const getSeverityColor = (severity: string) => {
     switch (severity.toLowerCase()) {
@@ -61,7 +68,9 @@ const FraudAlertsList = () => {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Fraud Alerts</h2>
 
-      {alerts && alerts.length > 0 ? (
+      {isLoading ? (
+        <div>Loading alerts...</div>
+      ) : alerts && alerts.length > 0 ? (
         <div className="space-y-4">
           {alerts.map((alert) => (
             <Card key={alert.id}>
@@ -95,7 +104,7 @@ const FraudAlertsList = () => {
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-10">
-            <AlertTriangle className="h-10 w-10 text-muted-foreground mb-4" />
+            <CheckCircle className="h-10 w-10 text-green-500 mb-4" />
             <h3 className="text-lg font-medium">No fraud alerts detected</h3>
             <p className="text-muted-foreground text-sm mt-1">
               All documents have passed verification

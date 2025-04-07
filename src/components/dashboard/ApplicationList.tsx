@@ -1,6 +1,5 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -18,21 +17,38 @@ interface Application {
 }
 
 const ApplicationList = () => {
-  const { data: applications, isLoading, error } = useQuery({
-    queryKey: ['applications'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('mortgage_applications')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as Application[];
+  // Mock data until the Supabase schema is properly set up
+  const [applications, setApplications] = useState<Application[]>([
+    {
+      id: "app-001",
+      client_name: "John Smith",
+      stage: "Document Verification",
+      progress: 35,
+      status: "Pending",
+      fraud_score: "Low",
+      created_at: new Date().toISOString(),
     },
-  });
-
-  if (isLoading) return <div>Loading applications...</div>;
-  if (error) return <div>Error loading applications</div>;
+    {
+      id: "app-002",
+      client_name: "Emily Johnson",
+      stage: "Income Verification",
+      progress: 65,
+      status: "Pending",
+      fraud_score: "Low",
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: "app-003",
+      client_name: "Robert Davis",
+      stage: "Property Appraisal",
+      progress: 80,
+      status: "Approved",
+      fraud_score: null,
+      created_at: new Date().toISOString(),
+    },
+  ]);
+  
+  const [isLoading, setIsLoading] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -57,7 +73,9 @@ const ApplicationList = () => {
         </Button>
       </div>
 
-      {applications && applications.length > 0 ? (
+      {isLoading ? (
+        <div>Loading applications...</div>
+      ) : applications && applications.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {applications.map((app) => (
             <Card key={app.id} className="overflow-hidden">
