@@ -7,6 +7,7 @@ import ApplicationList from "@/components/dashboard/ApplicationList";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FraudAlertsList from "@/components/dashboard/FraudAlertsList";
 import AWSIntegration from "@/components/dashboard/AWSIntegration";
+import ApplicationStageFlow from "@/components/dashboard/ApplicationStageFlow";
 
 const Dashboard = () => {
   const [activePage, setActivePage] = useState("overview");
@@ -17,6 +18,8 @@ const Dashboard = () => {
         return <DashboardOverview />;
       case "applications":
         return <ApplicationList />;
+      case "application-stages":
+        return <ApplicationStageFlow />;
       case "alerts":
         return <FraudAlertsList />;
       case "settings":

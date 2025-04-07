@@ -1,76 +1,127 @@
 
-import { Home, Users, FileText, AlertTriangle, Settings } from "lucide-react";
-import { 
-  Sidebar, 
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton 
-} from "@/components/ui/sidebar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useSidebar } from "@/components/ui/sidebar";
+import {
+  BarChart3,
+  FileText,
+  Settings,
+  Menu,
+  AlertTriangle,
+  Users,
+  ClipboardList,
+} from "lucide-react";
 
-const DashboardSidebar = ({ activePage, setActivePage }: { 
-  activePage: string, 
-  setActivePage: (page: string) => void 
-}) => {
-  return (
-    <Sidebar>
-      <SidebarHeader>
-        <div className="pl-2 text-center font-semibold text-lg">
-          Mortgage Verification
+interface DashboardSidebarProps {
+  activePage: string;
+  setActivePage: (page: string) => void;
+}
+
+const DashboardSidebar = ({
+  activePage,
+  setActivePage,
+}: DashboardSidebarProps) => {
+  const { open, setOpen } = useSidebar();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+
+    return () => {
+      window.removeEventListener("resize", checkScreenSize);
+    };
+  }, []);
+
+  const navigation = [
+    {
+      name: "Overview",
+      icon: <BarChart3 className="h-5 w-5" />,
+      value: "overview",
+    },
+    {
+      name: "Applications",
+      icon: <FileText className="h-5 w-5" />,
+      value: "applications",
+    },
+    {
+      name: "Application Stages",
+      icon: <ClipboardList className="h-5 w-5" />,
+      value: "application-stages",
+    },
+    {
+      name: "Fraud Alerts",
+      icon: <AlertTriangle className="h-5 w-5" />,
+      value: "alerts",
+    },
+    {
+      name: "Clients",
+      icon: <Users className="h-5 w-5" />,
+      value: "clients",
+    },
+    {
+      name: "AWS Integration",
+      icon: <Settings className="h-5 w-5" />,
+      value: "settings",
+    },
+  ];
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full py-4">
+      <div className="px-3 my-2">
+        <h2 className="text-lg font-semibold mb-2 px-4">Dashboard</h2>
+        <div className="space-y-1">
+          {navigation.map((item) => (
+            <Button
+              key={item.value}
+              variant={activePage === item.value ? "secondary" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => {
+                setActivePage(item.value);
+                if (isMobile) setOpen(false);
+              }}
+            >
+              {item.icon}
+              <span className="ml-3">{item.name}</span>
+            </Button>
+          ))}
         </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              isActive={activePage === "overview"} 
-              onClick={() => setActivePage("overview")}
-            >
-              <Home />
-              <span>Overview</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              isActive={activePage === "applications"} 
-              onClick={() => setActivePage("applications")}
-            >
-              <FileText />
-              <span>Applications</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              isActive={activePage === "clients"} 
-              onClick={() => setActivePage("clients")}
-            >
-              <Users />
-              <span>Clients</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              isActive={activePage === "alerts"} 
-              onClick={() => setActivePage("alerts")}
-            >
-              <AlertTriangle />
-              <span>Fraud Alerts</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              isActive={activePage === "settings"} 
-              onClick={() => setActivePage("settings")}
-            >
-              <Settings />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarContent>
-    </Sidebar>
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="fixed bottom-4 right-4 z-50 rounded-full md:hidden shadow-md bg-primary text-primary-foreground"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="p-0">
+          <SidebarContent />
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <div
+      className={`border-r bg-background transition-all duration-300 hidden md:block overflow-y-auto ${
+        open ? "w-64" : "w-[70px]"
+      }`}
+    >
+      <SidebarContent />
+    </div>
   );
 };
 
