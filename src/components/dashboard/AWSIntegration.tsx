@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, XCircle, Cloud, AlertTriangle, InformationCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Cloud, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -26,14 +25,13 @@ const AWSIntegration = () => {
   });
   
   useEffect(() => {
-    // Check if there's existing connection status in localStorage
     const savedConnection = localStorage.getItem('aws-connection');
     if (savedConnection) {
       try {
         const savedData = JSON.parse(savedConnection);
         setAwsCredentials({
           accessKeyId: savedData.accessKeyId || "",
-          secretAccessKey: "••••••••••••••••", // Don't store the actual secret
+          secretAccessKey: "••••••••••••••••",
           region: savedData.region || "ca-central-1",
           s3Enabled: savedData.s3Enabled || false
         });
@@ -47,7 +45,6 @@ const AWSIntegration = () => {
   const handleConnect = () => {
     setIsLoading(true);
     
-    // Validate AWS credentials format
     if (!awsCredentials.accessKeyId || !awsCredentials.accessKeyId.match(/^[A-Z0-9]{20}$/)) {
       toast({
         title: "Invalid Access Key ID",
@@ -68,21 +65,19 @@ const AWSIntegration = () => {
       return;
     }
     
-    // Store credentials in localStorage (excluding the secret key for security)
     const safeCredentials = {
       accessKeyId: awsCredentials.accessKeyId,
       region: awsCredentials.region,
       s3Enabled: true
     };
     
-    // Simulate API call to validate credentials
     setTimeout(() => {
       setIsLoading(false);
       setIsConnected(true);
       setAwsCredentials({
         ...awsCredentials,
         s3Enabled: true,
-        secretAccessKey: "••••••••••••••••" // Mask the key after saving
+        secretAccessKey: "••••••••••••••••"
       });
       
       localStorage.setItem('aws-connection', JSON.stringify(safeCredentials));
@@ -170,7 +165,7 @@ const AWSIntegration = () => {
               <div className="rounded-md bg-blue-50 p-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <InformationCircle className="h-5 w-5 text-blue-400" />
+                    <Info className="h-5 w-5 text-blue-400" />
                   </div>
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-blue-800">Free Tier Usage</h3>
@@ -261,7 +256,7 @@ const AWSIntegration = () => {
               <div className="rounded-md bg-blue-50 p-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <InformationCircle className="h-5 w-5 text-blue-400" />
+                    <Info className="h-5 w-5 text-blue-400" />
                   </div>
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-blue-800">Free Tier Information</h3>
@@ -327,7 +322,7 @@ const AWSIntegration = () => {
             <div className="rounded-md bg-blue-50 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <InformationCircle className="h-5 w-5 text-blue-400" />
+                  <Info className="h-5 w-5 text-blue-400" />
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-blue-800">About Amazon S3</h3>
@@ -384,25 +379,6 @@ function Checkbox({
       disabled={disabled}
       className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
     />
-  );
-}
-
-function InformationCircle(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
   );
 }
 
