@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,11 @@ import { useToast } from "@/components/ui/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("login");
 
   const [loginData, setLoginData] = useState({
     email: "",
@@ -27,19 +29,41 @@ const Login = () => {
     confirmPassword: "",
   });
 
+  // Parse tab from URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab === "register") {
+      setActiveTab("register");
+    } else {
+      setActiveTab("login");
+    }
+  }, [location]);
+
   // Redirect if already logged in
-  if (user) {
-    navigate("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!loginData.email || !loginData.password) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
+      console.log("Attempting to sign in with:", loginData.email);
       await signIn(loginData.email, loginData.password);
-      navigate("/dashboard");
-    } catch (error) {
+      // Navigation is handled by the useEffect when user state changes
+    } catch (error: any) {
       console.error("Login error:", error);
     } finally {
       setLoading(false);
@@ -48,6 +72,15 @@ const Login = () => {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!registerData.fullName || !registerData.email || !registerData.password || !registerData.confirmPassword) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (registerData.password !== registerData.confirmPassword) {
       toast({
@@ -58,19 +91,32 @@ const Login = () => {
       return;
     }
 
+    if (registerData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
+      console.log("Attempting to sign up with:", registerData.email);
       await signUp(registerData.email, registerData.password, registerData.fullName);
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account before logging in.",
-      });
-    } catch (error) {
+      // After successful registration, show a toast but don't navigate
+      // The user needs to verify their email first
+      setActiveTab("login");
+    } catch (error: any) {
       console.error("Registration error:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  if (user) {
+    return null; // Prevent flash of content before redirect
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -91,7 +137,7 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
