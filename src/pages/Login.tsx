@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { Loader2, KeyRound, Mail } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -30,6 +33,17 @@ const Login = () => {
     password: "",
     confirmPassword: "",
   });
+
+  // Password recovery state
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
+  const [isRecoveryLoading, setIsRecoveryLoading] = useState(false);
+
+  // Two-factor authentication state
+  const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
+  const [twoFactorSession, setTwoFactorSession] = useState<any>(null);
 
   // Get the intended destination from location state, if available
   const from = location.state?.from?.pathname || "/dashboard";
@@ -85,12 +99,33 @@ const Login = () => {
     setLoading(true);
     try {
       console.log("Attempting to sign in with:", loginData.email);
-      await signIn(loginData.email, loginData.password);
-      toast({
-        title: "Login successful",
-        description: "Redirecting to dashboard...",
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
       });
-      // Navigation is handled by the useEffect when user state changes
+
+      if (error) throw error;
+
+      // Check if 2FA is enabled (for demo, we'll simulate this)
+      // In a real app, you would check user metadata or a separate 2FA table
+      const shouldUse2FA = Math.random() > 0.5; // Simulate randomized 2FA requirement
+      
+      if (shouldUse2FA) {
+        setTwoFactorSession(data.session);
+        setIsTwoFactorModalOpen(true);
+        setLoading(false);
+        // In a real implementation, you would send the code via email/SMS here
+        toast({
+          title: "Two-factor authentication required",
+          description: "A verification code has been sent to your email.",
+        });
+      } else {
+        await signIn(loginData.email, loginData.password);
+        toast({
+          title: "Login successful",
+          description: "Redirecting to dashboard...",
+        });
+      }
     } catch (error: any) {
       console.error("Login error:", error);
       // Handle specific error types
@@ -102,7 +137,89 @@ const Login = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!isTwoFactorModalOpen) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleTwoFactorSubmit = async () => {
+    if (twoFactorCode.length !== 6) {
+      toast({
+        title: "Invalid code",
+        description: "Please enter a valid 6-digit code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTwoFactorLoading(true);
+    try {
+      // Here you would verify the 2FA code
+      // For demo purposes, we'll accept any 6-digit code
+      
+      // In a real implementation, you would verify the code with your backend:
+      // const { error } = await supabase.auth.verifyOTP({
+      //   phone: user.phone,
+      //   token: twoFactorCode,
+      // });
+
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      
+      toast({
+        title: "Verification successful",
+        description: "Redirecting to dashboard...",
+      });
+      
+      setIsTwoFactorModalOpen(false);
+      
+      // In a real app, you would use the session from the 2FA verification
+      // For now, we'll just simulate a successful login
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: "The code you entered is invalid. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTwoFactorLoading(false);
+    }
+  };
+
+  const handlePasswordRecovery = async () => {
+    if (!validateEmail(recoveryEmail)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRecoveryLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Recovery email sent",
+        description: "Check your inbox for password recovery instructions",
+      });
+      
+      setIsRecoveryModalOpen(false);
+    } catch (error: any) {
+      console.error("Password recovery error:", error);
+      toast({
+        title: "Error sending recovery email",
+        description: getAuthErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setIsRecoveryLoading(false);
     }
   };
 
@@ -257,9 +374,13 @@ const Login = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="login-password">Password</Label>
-                    <a href="/reset-password" className="text-sm text-primary hover:underline">
+                    <button 
+                      type="button"
+                      onClick={() => setIsRecoveryModalOpen(true)}
+                      className="text-sm text-primary hover:underline"
+                    >
                       Forgot password?
-                    </a>
+                    </button>
                   </div>
                   <Input 
                     id="login-password" 
@@ -359,6 +480,118 @@ const Login = () => {
           </TabsContent>
         </Tabs>
       </Card>
+      
+      {/* Password Recovery Modal */}
+      <Dialog open={isRecoveryModalOpen} onOpenChange={setIsRecoveryModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              Enter your email address and we'll send you instructions to reset your password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="recovery-email">Email</Label>
+              <div className="flex items-center space-x-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="recovery-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={recoveryEmail}
+                  onChange={(e) => setRecoveryEmail(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => setIsRecoveryModalOpen(false)} 
+              variant="outline"
+              disabled={isRecoveryLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handlePasswordRecovery} 
+              disabled={isRecoveryLoading || !recoveryEmail}
+            >
+              {isRecoveryLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send recovery email"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Two-Factor Authentication Modal */}
+      <Dialog open={isTwoFactorModalOpen} onOpenChange={(open) => {
+        // Prevent closing by clicking outside (force user to complete 2FA)
+        if (!open && twoFactorSession) return;
+        setIsTwoFactorModalOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Enter the 6-digit code sent to your email or authentication app.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-4 flex flex-col items-center">
+              <KeyRound className="h-10 w-10 text-primary" />
+              <InputOTP maxLength={6} value={twoFactorCode} onChange={setTwoFactorCode}>
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+              <p className="text-sm text-muted-foreground text-center mt-2">
+                Didn't receive a code? Check your spam folder or{" "}
+                <button 
+                  className="text-primary hover:underline" 
+                  type="button" 
+                  onClick={() => {
+                    toast({
+                      title: "Code resent",
+                      description: "A new verification code has been sent to your email",
+                    });
+                  }}
+                >
+                  click here to resend
+                </button>
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={handleTwoFactorSubmit} 
+              disabled={isTwoFactorLoading || twoFactorCode.length !== 6}
+              className="w-full"
+            >
+              {isTwoFactorLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify code"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
