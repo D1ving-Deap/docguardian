@@ -42,7 +42,7 @@ const PasswordRecoveryModal = ({ isOpen, onClose }: PasswordRecoveryModalProps) 
       const resetPasswordURL = `${window.location.origin}/reset-password`;
       console.log("Reset password redirect URL:", resetPasswordURL);
       
-      const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
         redirectTo: resetPasswordURL,
       });
 

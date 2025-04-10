@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { validatePassword } from "@/utils/authUtils";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -61,8 +62,9 @@ const ResetPassword = () => {
     setError(null);
     
     // Validate passwords
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters long");
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -71,22 +73,11 @@ const ResetPassword = () => {
       return;
     }
 
-    // Check for password requirements
-    const hasUpperCase = /[A-Z]/.test(newPassword);
-    const hasLowerCase = /[a-z]/.test(newPassword);
-    const hasNumbers = /\d/.test(newPassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
-    
-    if (!(hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar)) {
-      setError("Password must contain uppercase, lowercase, numbers, and special characters");
-      return;
-    }
-
     try {
       setLoading(true);
       
       // Update the user's password
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { data, error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
       
