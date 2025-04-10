@@ -62,9 +62,9 @@ export const getAuthErrorMessage = (error: any): string => {
 
 export const resendVerificationEmail = async (email: string): Promise<void> => {
   try {
-    // In Supabase v2, we use resendConfirmationEmail for resending verification emails
-    // For an already registered user who hasn't verified their email
-    const { error } = await supabase.auth.resendConfirmationEmail({
+    // In Supabase v2, we use resend for resending verification emails
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
       email,
       options: {
         emailRedirectTo: `${window.location.origin}/verify-email`,

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -152,8 +151,7 @@ const Login = () => {
 
   const handleTwoFactorVerify = async (code: string) => {
     try {
-      // In a real implementation, this would verify the code with Supabase
-      // For email OTP verification with Supabase, we would use verifyOtp
+      // In Supabase v2, we use verifyOtp method
       const { error } = await supabase.auth.verifyOtp({
         email: currentEmail,
         token: code,

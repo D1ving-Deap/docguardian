@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -92,16 +91,13 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
     setIsLoading(true);
     try {
       if (isEmailMethod) {
-        // For email-based 2FA, we can use the Supabase auth API
-        const { error } = await supabase.auth.resendOtp({
+        const { error } = await supabase.auth.resend({
+          type: 'otp',
           email,
-          type: 'email',
         });
         
         if (error) throw error;
       } else {
-        // For app-based 2FA, this would be different
-        // This is just a placeholder for now
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
