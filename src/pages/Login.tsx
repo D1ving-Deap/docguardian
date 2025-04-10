@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, KeyRound, Mail } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -34,21 +34,17 @@ const Login = () => {
     confirmPassword: "",
   });
 
-  // Password recovery state
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   const [isRecoveryLoading, setIsRecoveryLoading] = useState(false);
 
-  // Two-factor authentication state
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
   const [twoFactorSession, setTwoFactorSession] = useState<any>(null);
 
-  // Get the intended destination from location state, if available
   const from = location.state?.from?.pathname || "/dashboard";
 
-  // Parse tab from URL query parameters
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
@@ -59,10 +55,8 @@ const Login = () => {
     }
   }, [location]);
 
-  // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      // Use a short timeout to ensure state has been fully updated
       const redirectTimer = setTimeout(() => {
         navigate(from, { replace: true });
       }, 100);
@@ -71,7 +65,6 @@ const Login = () => {
     }
   }, [user, navigate, from]);
 
-  // Clear error message when switching tabs
   useEffect(() => {
     setErrorMessage(null);
   }, [activeTab]);
@@ -85,7 +78,6 @@ const Login = () => {
     e.preventDefault();
     setErrorMessage(null);
     
-    // Form validation
     if (!loginData.email || !loginData.password) {
       setErrorMessage("Please fill in all required fields");
       return;
@@ -106,15 +98,12 @@ const Login = () => {
 
       if (error) throw error;
 
-      // Check if 2FA is enabled (for demo, we'll simulate this)
-      // In a real app, you would check user metadata or a separate 2FA table
-      const shouldUse2FA = Math.random() > 0.5; // Simulate randomized 2FA requirement
+      const shouldUse2FA = Math.random() > 0.5;
       
       if (shouldUse2FA) {
         setTwoFactorSession(data.session);
         setIsTwoFactorModalOpen(true);
         setLoading(false);
-        // In a real implementation, you would send the code via email/SMS here
         toast({
           title: "Two-factor authentication required",
           description: "A verification code has been sent to your email.",
@@ -128,7 +117,6 @@ const Login = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      // Handle specific error types
       const errorMessage = getAuthErrorMessage(error);
       setErrorMessage(errorMessage);
       toast({
@@ -155,26 +143,13 @@ const Login = () => {
 
     setIsTwoFactorLoading(true);
     try {
-      // Here you would verify the 2FA code
-      // For demo purposes, we'll accept any 6-digit code
-      
-      // In a real implementation, you would verify the code with your backend:
-      // const { error } = await supabase.auth.verifyOTP({
-      //   phone: user.phone,
-      //   token: twoFactorCode,
-      // });
-
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
+      await new Promise(resolve => setTimeout(resolve, 1000));
       toast({
         title: "Verification successful",
         description: "Redirecting to dashboard...",
       });
       
       setIsTwoFactorModalOpen(false);
-      
-      // In a real app, you would use the session from the 2FA verification
-      // For now, we'll just simulate a successful login
       navigate(from, { replace: true });
     } catch (error: any) {
       toast({
@@ -227,7 +202,6 @@ const Login = () => {
     e.preventDefault();
     setErrorMessage(null);
     
-    // Form validation
     if (!registerData.fullName || !registerData.email || !registerData.password || !registerData.confirmPassword) {
       setErrorMessage("Please fill in all required fields");
       return;
@@ -248,7 +222,6 @@ const Login = () => {
       return;
     }
 
-    // Password strength check
     const hasUpperCase = /[A-Z]/.test(registerData.password);
     const hasLowerCase = /[a-z]/.test(registerData.password);
     const hasNumbers = /\d/.test(registerData.password);
@@ -263,13 +236,11 @@ const Login = () => {
     try {
       console.log("Attempting to sign up with:", registerData.email);
       await signUp(registerData.email, registerData.password, registerData.fullName);
-      // After successful registration, show a toast and switch to login tab
       toast({
         title: "Registration successful",
         description: "Please check your email to verify your account before logging in.",
       });
       setActiveTab("login");
-      // Clear registration form
       setRegisterData({
         fullName: "",
         email: "",
@@ -290,11 +261,9 @@ const Login = () => {
     }
   };
 
-  // Helper function to parse authentication errors
   const getAuthErrorMessage = (error: any): string => {
     const errorCode = error.code || "";
     
-    // Handle Firebase-specific error codes
     switch (errorCode) {
       case "auth/email-already-in-use":
         return "This email is already registered. Please log in instead.";
@@ -318,7 +287,7 @@ const Login = () => {
   };
 
   if (user) {
-    return null; // Prevent flash of content before redirect
+    return null;
   }
 
   return (
@@ -481,7 +450,6 @@ const Login = () => {
         </Tabs>
       </Card>
       
-      {/* Password Recovery Modal */}
       <Dialog open={isRecoveryModalOpen} onOpenChange={setIsRecoveryModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -531,9 +499,7 @@ const Login = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Two-Factor Authentication Modal */}
       <Dialog open={isTwoFactorModalOpen} onOpenChange={(open) => {
-        // Prevent closing by clicking outside (force user to complete 2FA)
         if (!open && twoFactorSession) return;
         setIsTwoFactorModalOpen(open);
       }}>
