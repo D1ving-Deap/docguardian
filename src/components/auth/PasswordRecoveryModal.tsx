@@ -38,8 +38,8 @@ const PasswordRecoveryModal = ({ isOpen, onClose }: PasswordRecoveryModalProps) 
 
     setIsLoading(true);
     try {
-      // Make sure we're using the proper redirect URL formatting
-      const resetPasswordURL = `${window.location.origin}/reset-password`;
+      // Updated to use production redirect URL
+      const resetPasswordURL = "https://verify-flow.com/reset-password";
       console.log("Reset password redirect URL:", resetPasswordURL);
       
       const { data, error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
