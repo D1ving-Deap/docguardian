@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -92,7 +93,7 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
     try {
       if (isEmailMethod) {
         const { error } = await supabase.auth.resend({
-          type: 'otp',
+          type: 'signup',  // Updated from 'otp' to 'signup' which is a valid type
           email,
         });
         
@@ -204,3 +205,4 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
 };
 
 export default TwoFactorAuthModal;
+
