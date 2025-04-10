@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -108,7 +107,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
         options: {
           data: { full_name: fullName },
-          emailRedirectTo: "https://verify-flow.com", // Changed from window.location.origin to production URL
+          emailRedirectTo: "https://verify-flow.com", // ✅ full URL with protocol
         },
       });
 

@@ -38,7 +38,7 @@ const PasswordRecoveryModal = ({ isOpen, onClose }: PasswordRecoveryModalProps) 
 
     setIsLoading(true);
     try {
-      // Updated to use production redirect URL
+      // Updated to use production redirect URL with the exact format
       const resetPasswordURL = "https://verify-flow.com/reset-password";
       console.log("Reset password redirect URL:", resetPasswordURL);
       

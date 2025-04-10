@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export const validateEmail = (email: string): boolean => {
@@ -66,7 +67,7 @@ export const resendVerificationEmail = async (email: string): Promise<void> => {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: "https://verify-flow.com", // Changed from window.location.origin to production URL
+        emailRedirectTo: "https://verify-flow.com", // ✅ full URL with protocol
       }
     });
 
@@ -80,7 +81,7 @@ export const resendVerificationEmail = async (email: string): Promise<void> => {
         email,
         password: generateTempPassword(), // Generate a secure random password
         options: {
-          emailRedirectTo: "https://verify-flow.com", // Changed from window.location.origin to production URL
+          emailRedirectTo: "https://verify-flow.com", // ✅ full URL with protocol
         },
       });
       
