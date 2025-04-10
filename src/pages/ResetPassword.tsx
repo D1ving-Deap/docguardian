@@ -27,6 +27,8 @@ const ResetPassword = () => {
     const accessToken = searchParams.get("access_token");
     const type = searchParams.get("type");
     
+    console.log("Password reset params:", { accessToken: !!accessToken, type });
+    
     // Check if this is a valid reset password request
     if (!accessToken || type !== "recovery") {
       setExpired(true);
@@ -34,6 +36,22 @@ const ResetPassword = () => {
         title: "Invalid or expired link",
         description: "This password reset link is invalid or has expired. Please request a new password reset.",
         variant: "destructive"
+      });
+    } else {
+      // If we have a valid token, set the session
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: "",
+      }).then(({ error }) => {
+        if (error) {
+          console.error("Error setting session:", error);
+          setExpired(true);
+          toast({
+            title: "Invalid or expired token",
+            description: "Please request a new password reset link.",
+            variant: "destructive"
+          });
+        }
       });
     }
   }, [searchParams, toast]);
@@ -66,14 +84,6 @@ const ResetPassword = () => {
 
     try {
       setLoading(true);
-      
-      // Get the access token from the URL
-      const accessToken = searchParams.get("access_token");
-      
-      if (!accessToken) {
-        setError("No access token found in the URL");
-        return;
-      }
       
       // Update the user's password
       const { error: updateError } = await supabase.auth.updateUser({

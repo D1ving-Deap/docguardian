@@ -93,7 +93,7 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
     try {
       if (isEmailMethod) {
         const { error } = await supabase.auth.resend({
-          type: 'signup',  // Updated from 'otp' to 'signup' which is a valid type
+          type: 'signup',  // Use 'signup' which is a valid type for resending verification
           email,
         });
         
@@ -205,4 +205,3 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
 };
 
 export default TwoFactorAuthModal;
-
