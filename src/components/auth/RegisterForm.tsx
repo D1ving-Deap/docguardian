@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { validateEmail, validatePassword, resendVerificationEmail } from "@/utils/authUtils";
+import { validateEmail, validatePassword } from "@/utils/authUtils";
 import { useToast } from "@/components/ui/use-toast";
 
 interface RegisterFormProps {
@@ -55,39 +55,8 @@ const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange }: Register
     try {
       await onSubmit(registerData.fullName, registerData.email, registerData.password);
       
-      toast({
-        title: "Account created",
-        description: (
-          <div>
-            Please check your email to verify your account.
-            <div className="mt-2">
-              Didn't get the email?{" "}
-              <button
-                className="text-primary hover:underline"
-                onClick={async () => {
-                  try {
-                    await resendVerificationEmail(registerData.email);
-                    toast({
-                      title: "Verification resent",
-                      description: "Check your inbox for the new verification link.",
-                    });
-                  } catch (resendErr: any) {
-                    toast({
-                      title: "Error resending verification",
-                      description: resendErr.message,
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                Resend verification
-              </button>
-            </div>
-          </div>
-        ),
-      });
-
-      onTabChange("login");
+      // Reset form after successful submission
+      // The toast notification is now handled in the Login component
       setRegisterData({
         fullName: "",
         email: "",

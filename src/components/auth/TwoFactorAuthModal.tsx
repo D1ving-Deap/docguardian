@@ -9,7 +9,7 @@ import {
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound, Loader2, Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/components/ui/use-toast";
 import { validateTwoFactorCode } from "@/utils/authUtils";
@@ -29,6 +29,7 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [isEmailMethod, setIsEmailMethod] = useState(true); // Default to email method
 
   useEffect(() => {
     if (isOpen) {
@@ -90,8 +91,19 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
 
     setIsLoading(true);
     try {
-      // Simulate 2FA code resend for demonstration purposes
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (isEmailMethod) {
+        // For email-based 2FA, we can use the Supabase auth API
+        const { error } = await supabase.auth.resendOtp({
+          email,
+          type: 'email',
+        });
+        
+        if (error) throw error;
+      } else {
+        // For app-based 2FA, this would be different
+        // This is just a placeholder for now
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
       toast({
         title: "Code resent",
@@ -101,9 +113,10 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
       setCountdown(60);
       setCanResend(false);
     } catch (error: any) {
+      console.error("Error resending code:", error);
       toast({
         title: "Error",
-        description: "Failed to resend verification code. Please try again.",
+        description: error.message || "Failed to resend verification code. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -115,6 +128,7 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
     <Dialog 
       open={isOpen} 
       onOpenChange={(open) => {
+        if (!open && isLoading) return; // Prevent closing while loading
         if (!open && session) return;
         !open && onClose();
       }}
@@ -123,7 +137,9 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
         <DialogHeader>
           <DialogTitle>Two-factor authentication</DialogTitle>
           <DialogDescription>
-            Enter the 6-digit code sent to your email or authentication app.
+            {isEmailMethod 
+              ? "Enter the 6-digit code sent to your email." 
+              : "Enter the 6-digit code from your authentication app."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -144,12 +160,22 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFa
                 <>
                   Didn't receive a code? Check your spam folder or{" "}
                   <button 
-                    className="text-primary hover:underline" 
+                    className="text-primary hover:underline flex items-center" 
                     type="button" 
                     onClick={handleResendCode}
                     disabled={isLoading}
                   >
-                    click here to resend
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="mr-1 h-3 w-3" />
+                        click here to resend
+                      </>
+                    )}
                   </button>
                 </>
               ) : (

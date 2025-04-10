@@ -65,7 +65,14 @@ const Login = () => {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for unverified email error
+        if (error.message.includes("Email not confirmed") || 
+            error.message.includes("not confirmed")) {
+          throw new Error("Your email is not verified. Please check your inbox for the verification link.");
+        }
+        throw error;
+      }
 
       // For demonstration purposes, randomly require 2FA
       // In a real application, this would be based on user configuration or your security policy
@@ -92,7 +99,9 @@ const Login = () => {
       setErrorMessage(errorMessage);
       
       // Check if the error is due to unverified email
-      if (error.message?.includes("Email not confirmed") || error.message?.includes("not confirmed")) {
+      if (error.message?.includes("Email not confirmed") || 
+          error.message?.includes("not confirmed") ||
+          error.message?.includes("not verified")) {
         toast({
           title: "Email not verified",
           description: (
@@ -109,6 +118,8 @@ const Login = () => {
                         title: "Verification resent",
                         description: "Check your inbox for the new verification link.",
                       });
+                      // Redirect to verification page with email
+                      navigate("/verify-email");
                     } catch (resendErr: any) {
                       toast({
                         title: "Error resending verification",
@@ -142,10 +153,16 @@ const Login = () => {
   const handleTwoFactorVerify = async (code: string) => {
     try {
       // In a real implementation, this would verify the code with Supabase
-      // For now, we'll simulate a successful verification
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // For email OTP verification with Supabase, we would use verifyOtp
+      const { error } = await supabase.auth.verifyOtp({
+        email: currentEmail,
+        token: code,
+        type: 'email'
+      });
       
-      // After successful 2FA verification, we need to complete the sign-in
+      if (error) throw error;
+      
+      // After successful 2FA verification, complete the sign-in
       await signIn(currentEmail, ""); // Password not needed here as we already have the session
       
       toast({
@@ -156,6 +173,7 @@ const Login = () => {
       setIsTwoFactorModalOpen(false);
       navigate(from, { replace: true });
     } catch (error: any) {
+      console.error("2FA verification error:", error);
       toast({
         title: "Verification failed",
         description: error.message || "Invalid verification code",
@@ -173,16 +191,57 @@ const Login = () => {
       console.log("Attempting to sign up with:", email);
       await signUp(email, password, fullName);
       
+      // Navigate to verification page
+      navigate("/verify-email");
+      
       // The toast notification is now handled in the RegisterForm component
     } catch (error: any) {
       console.error("Registration error:", error);
       const errorMessage = getAuthErrorMessage(error);
       setErrorMessage(errorMessage);
-      toast({
-        title: "Registration failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      
+      // If the error indicates the user already exists but email is not verified
+      if (error.message?.includes("already registered") || 
+          error.message?.includes("already exists")) {
+        toast({
+          title: "Email already registered",
+          description: (
+            <div>
+              This email is already registered. If you haven't verified your email yet:
+              <div className="mt-2">
+                <button
+                  className="text-primary hover:underline"
+                  onClick={async () => {
+                    try {
+                      await resendVerificationEmail(email);
+                      toast({
+                        title: "Verification resent",
+                        description: "Check your inbox for the new verification link.",
+                      });
+                      navigate("/verify-email");
+                    } catch (resendErr: any) {
+                      toast({
+                        title: "Error resending verification",
+                        description: resendErr.message,
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  Resend verification email
+                </button>
+              </div>
+            </div>
+          ),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Registration failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
