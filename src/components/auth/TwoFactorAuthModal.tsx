@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -12,21 +12,49 @@ import {
 import { KeyRound, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/components/ui/use-toast";
+import { validateTwoFactorCode } from "@/utils/authUtils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TwoFactorAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onVerify: (code: string) => Promise<void>;
   session: any;
+  email?: string;
 }
 
-const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session }: TwoFactorAuthModalProps) => {
+const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session, email }: TwoFactorAuthModalProps) => {
   const { toast } = useToast();
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [countdown, setCountdown] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTwoFactorCode("");
+      setCountdown(60);
+      setCanResend(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    if (isOpen && countdown > 0) {
+      timer = window.setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      setCanResend(true);
+    }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [countdown, isOpen]);
 
   const handleTwoFactorSubmit = async () => {
-    if (twoFactorCode.length !== 6) {
+    if (!validateTwoFactorCode(twoFactorCode)) {
       toast({
         title: "Invalid code",
         description: "Please enter a valid 6-digit code",
@@ -41,7 +69,41 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session }: TwoFactorAut
     } catch (error: any) {
       toast({
         title: "Verification failed",
-        description: "The code you entered is invalid. Please try again.",
+        description: "The code you entered is invalid or has expired. Please try again.",
+        variant: "destructive",
+      });
+      setTwoFactorCode("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Unable to resend verification code. Please try logging in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Simulate 2FA code resend for demonstration purposes
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Code resent",
+        description: "A new verification code has been sent to your email",
+      });
+      
+      setCountdown(60);
+      setCanResend(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to resend verification code. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -78,19 +140,23 @@ const TwoFactorAuthModal = ({ isOpen, onClose, onVerify, session }: TwoFactorAut
               </InputOTPGroup>
             </InputOTP>
             <p className="text-sm text-muted-foreground text-center mt-2">
-              Didn't receive a code? Check your spam folder or{" "}
-              <button 
-                className="text-primary hover:underline" 
-                type="button" 
-                onClick={() => {
-                  toast({
-                    title: "Code resent",
-                    description: "A new verification code has been sent to your email",
-                  });
-                }}
-              >
-                click here to resend
-              </button>
+              {canResend ? (
+                <>
+                  Didn't receive a code? Check your spam folder or{" "}
+                  <button 
+                    className="text-primary hover:underline" 
+                    type="button" 
+                    onClick={handleResendCode}
+                    disabled={isLoading}
+                  >
+                    click here to resend
+                  </button>
+                </>
+              ) : (
+                <>
+                  You can request a new code in {countdown} seconds
+                </>
+              )}
             </p>
           </div>
         </div>

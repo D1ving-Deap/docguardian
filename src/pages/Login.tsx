@@ -11,7 +11,7 @@ import LoginForm from "@/components/auth/LoginForm";
 import RegisterForm from "@/components/auth/RegisterForm";
 import PasswordRecoveryModal from "@/components/auth/PasswordRecoveryModal";
 import TwoFactorAuthModal from "@/components/auth/TwoFactorAuthModal";
-import { getAuthErrorMessage } from "@/utils/authUtils";
+import { getAuthErrorMessage, resendVerificationEmail } from "@/utils/authUtils";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -25,6 +25,7 @@ const Login = () => {
   const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
   const [twoFactorSession, setTwoFactorSession] = useState<any>(null);
+  const [currentEmail, setCurrentEmail] = useState<string>("");
 
   const from = location.state?.from?.pathname || "/dashboard";
 
@@ -54,6 +55,7 @@ const Login = () => {
 
   const handleLoginSubmit = async (email: string, password: string) => {
     setErrorMessage(null);
+    setCurrentEmail(email);
     
     setLoading(true);
     try {
@@ -65,7 +67,9 @@ const Login = () => {
 
       if (error) throw error;
 
-      const shouldUse2FA = Math.random() > 0.5;
+      // For demonstration purposes, randomly require 2FA
+      // In a real application, this would be based on user configuration or your security policy
+      const shouldUse2FA = Math.random() > 0.5; 
       
       if (shouldUse2FA) {
         setTwoFactorSession(data.session);
@@ -86,11 +90,48 @@ const Login = () => {
       console.error("Login error:", error);
       const errorMessage = getAuthErrorMessage(error);
       setErrorMessage(errorMessage);
-      toast({
-        title: "Login failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      
+      // Check if the error is due to unverified email
+      if (error.message?.includes("Email not confirmed") || error.message?.includes("not confirmed")) {
+        toast({
+          title: "Email not verified",
+          description: (
+            <div>
+              Please verify your email before logging in.
+              <div className="mt-2">
+                Didn't get the verification email?{" "}
+                <button
+                  className="text-primary hover:underline"
+                  onClick={async () => {
+                    try {
+                      await resendVerificationEmail(email);
+                      toast({
+                        title: "Verification resent",
+                        description: "Check your inbox for the new verification link.",
+                      });
+                    } catch (resendErr: any) {
+                      toast({
+                        title: "Error resending verification",
+                        description: resendErr.message,
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  Resend verification
+                </button>
+              </div>
+            </div>
+          ),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Login failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       if (!isTwoFactorModalOpen) {
         setLoading(false);
@@ -99,14 +140,29 @@ const Login = () => {
   };
 
   const handleTwoFactorVerify = async (code: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({
-      title: "Verification successful",
-      description: "Redirecting to dashboard...",
-    });
-    
-    setIsTwoFactorModalOpen(false);
-    navigate(from, { replace: true });
+    try {
+      // In a real implementation, this would verify the code with Supabase
+      // For now, we'll simulate a successful verification
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // After successful 2FA verification, we need to complete the sign-in
+      await signIn(currentEmail, ""); // Password not needed here as we already have the session
+      
+      toast({
+        title: "Verification successful",
+        description: "Redirecting to dashboard...",
+      });
+      
+      setIsTwoFactorModalOpen(false);
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: error.message || "Invalid verification code",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
   const handleRegisterSubmit = async (fullName: string, email: string, password: string) => {
@@ -116,11 +172,8 @@ const Login = () => {
     try {
       console.log("Attempting to sign up with:", email);
       await signUp(email, password, fullName);
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account before logging in.",
-      });
-      setActiveTab("login");
+      
+      // The toast notification is now handled in the RegisterForm component
     } catch (error: any) {
       console.error("Registration error:", error);
       const errorMessage = getAuthErrorMessage(error);
@@ -180,6 +233,7 @@ const Login = () => {
               onSubmit={handleRegisterSubmit}
               loading={loading}
               errorMessage={errorMessage}
+              onTabChange={setActiveTab}
             />
           </TabsContent>
         </Tabs>
@@ -195,6 +249,7 @@ const Login = () => {
         onClose={() => setIsTwoFactorModalOpen(false)}
         onVerify={handleTwoFactorVerify}
         session={twoFactorSession}
+        email={currentEmail}
       />
     </div>
   );

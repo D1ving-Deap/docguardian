@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -44,4 +46,21 @@ export const getAuthErrorMessage = (error: any): string => {
     default:
       return error.message || "An unexpected error occurred. Please try again.";
   }
+};
+
+export const resendVerificationEmail = async (email: string): Promise<void> => {
+  const { error } = await supabase.auth.signUp({
+    email,
+    password: "temporaryPassword123!@#", // Password is required but ignored if user already exists
+    options: {
+      emailRedirectTo: `${window.location.origin}/verify-email`,
+    },
+  });
+
+  if (error) throw error;
+};
+
+export const validateTwoFactorCode = (code: string): boolean => {
+  // Simple validation to check if the code is 6 digits
+  return /^\d{6}$/.test(code);
 };
