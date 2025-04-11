@@ -59,7 +59,7 @@ const ApplicationList = () => {
           schema: 'public',
           table: 'mortgage_applications'
         },
-        (payload) => {
+        () => {
           fetchApplications();
         }
       )
@@ -83,7 +83,7 @@ const ApplicationList = () => {
       }
       
       if (data) {
-        setApplications(data);
+        setApplications(data as Application[]);
       }
     } catch (error) {
       console.error("Error fetching applications:", error);

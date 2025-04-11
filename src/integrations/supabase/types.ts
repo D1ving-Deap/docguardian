@@ -9,6 +9,50 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      documents: {
+        Row: {
+          application_id: string | null
+          document_type: string
+          file_path: string
+          filename: string
+          id: string
+          raw_text: string | null
+          structured_data: Json | null
+          uploaded_at: string
+          verified: boolean | null
+        }
+        Insert: {
+          application_id?: string | null
+          document_type: string
+          file_path: string
+          filename: string
+          id?: string
+          raw_text?: string | null
+          structured_data?: Json | null
+          uploaded_at?: string
+          verified?: boolean | null
+        }
+        Update: {
+          application_id?: string | null
+          document_type?: string
+          file_path?: string
+          filename?: string
+          id?: string
+          raw_text?: string | null
+          structured_data?: Json | null
+          uploaded_at?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "mortgage_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "Gmail Waitlist": {
         Row: {
           created_at: string
@@ -21,6 +65,42 @@ export type Database = {
         Update: {
           created_at?: string
           "User Email"?: string
+        }
+        Relationships: []
+      }
+      mortgage_applications: {
+        Row: {
+          client_name: string
+          created_at: string
+          email: string
+          fraud_score: string | null
+          id: string
+          progress: number
+          stage: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          email: string
+          fraud_score?: string | null
+          id?: string
+          progress?: number
+          stage?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          email?: string
+          fraud_score?: string | null
+          id?: string
+          progress?: number
+          stage?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

@@ -47,9 +47,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
 
+interface ApplicationData {
+  id: string;
+  client_name: string;
+  email: string;
+  stage: string;
+  progress: number;
+  status: string;
+  fraud_score: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const ApplicationStageFlow = () => {
   const [currentStage, setCurrentStage] = useState("get-started");
-  const [application, setApplication] = useState<any>(null);
+  const [application, setApplication] = useState<ApplicationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { search } = useLocation();
   const applicationId = new URLSearchParams(search).get('id');
@@ -81,8 +93,8 @@ const ApplicationStageFlow = () => {
           },
           (payload) => {
             if (payload.new) {
-              setApplication(payload.new);
-              updateStageBasedOnProgress(payload.new.progress);
+              setApplication(payload.new as ApplicationData);
+              updateStageBasedOnProgress((payload.new as ApplicationData).progress);
             }
           }
         )
@@ -108,7 +120,7 @@ const ApplicationStageFlow = () => {
       }
       
       if (data) {
-        setApplication(data);
+        setApplication(data as ApplicationData);
         updateStageBasedOnProgress(data.progress);
       }
     } catch (error) {
@@ -140,7 +152,7 @@ const ApplicationStageFlow = () => {
   };
   
   const updateApplicationProgress = async (stage: string, increment: number) => {
-    if (!applicationId) return;
+    if (!applicationId || !application) return;
     
     try {
       // Get current application data
@@ -425,7 +437,7 @@ const DocumentUpload = ({
       formData.append('documentType', documentType);
       
       // Call our edge function to process the document
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/process-document`, {
+      const response = await fetch(`${supabase.url.origin}/functions/v1/process-document`, {
         method: 'POST',
         body: formData,
         headers: {
