@@ -5,40 +5,28 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
-// Get buckets data or create if they don't exist yet
-const initBuckets = async (): Promise<string[]> => {
+// Default bucket names
+const DEFAULT_BUCKETS = [
+  'user-documents',
+  'applications'
+];
+
+// Get buckets data
+const getBuckets = async (): Promise<string[]> => {
   try {
     // Check if our buckets exist
-    const { data: buckets } = await supabase.storage.listBuckets();
+    const { data: buckets, error } = await supabase.storage.listBuckets();
     
-    // Default bucket names
-    const defaultBuckets = [
-      'user-documents',
-      'system-documents',
-      'property-docs'
-    ];
-    
-    // Create any missing buckets
-    const existingBucketNames = buckets?.map(bucket => bucket.name) || [];
-    
-    for (const bucketName of defaultBuckets) {
-      if (!existingBucketNames.includes(bucketName)) {
-        console.log(`Creating bucket: ${bucketName}`);
-        const { error } = await supabase.storage.createBucket(bucketName, {
-          public: false
-        });
-        
-        if (error) {
-          console.error(`Error creating bucket ${bucketName}:`, error);
-        }
-      }
+    if (error) {
+      console.error("Error listing buckets:", error);
+      return [];
     }
     
-    return defaultBuckets;
+    return buckets?.map(bucket => bucket.name) || [];
   } catch (error) {
-    console.error("Error initializing buckets:", error);
+    console.error("Error getting buckets:", error);
     return [];
   }
 };
@@ -57,9 +45,6 @@ export const uploadFile = async (
   metadata?: Record<string, string>
 ): Promise<{ key: string; url: string } | { error: string }> => {
   try {
-    // Initialize buckets if needed
-    await initBuckets();
-    
     // Check if user is authenticated
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -110,12 +95,6 @@ export const getFile = async (
   bucket: string = 'user-documents'
 ): Promise<{ data: Blob; contentType: string } | { error: string }> => {
   try {
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return { error: 'Authentication required to access files' };
-    }
-    
     // Download file from Supabase Storage
     const { data, error } = await supabase.storage
       .from(bucket)
@@ -142,12 +121,6 @@ export const deleteFile = async (
   bucket: string = 'user-documents'
 ): Promise<{ success: boolean } | { error: string }> => {
   try {
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return { error: 'Authentication required to delete files' };
-    }
-    
     // Delete file from Supabase Storage
     const { error } = await supabase.storage
       .from(bucket)
@@ -171,12 +144,6 @@ export const listFiles = async (
   prefix?: string
 ): Promise<{ files: { key: string; size: number; lastModified: number }[] } | { error: string }> => {
   try {
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return { error: 'Authentication required to list files' };
-    }
-    
     // List files from Supabase Storage
     const { data, error } = await supabase.storage
       .from(bucket)
@@ -225,73 +192,12 @@ export const getFileUrl = async (
   }
 };
 
-// Get free tier usage
-export const getFreeTierUsage = async (): Promise<{
-  totalStorage: number;
-  totalStoragePercent: number;
-  bucketsUsage: Record<string, { size: number, files: number }>;
-} | { error: string }> => {
-  try {
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return { error: 'Authentication required to get usage statistics' };
-    }
-    
-    // Initialize buckets if needed
-    const bucketNames = await initBuckets();
-    
-    // Calculate total storage used
-    let totalStorage = 0;
-    const bucketsUsage: Record<string, { size: number, files: number }> = {};
-    
-    for (const bucketName of bucketNames) {
-      // List files in bucket
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .list('', {
-          limit: 1000,
-          offset: 0
-        });
-      
-      if (error) {
-        console.error(`Error listing files in bucket ${bucketName}:`, error);
-        continue;
-      }
-      
-      // Calculate bucket usage
-      const bucketSize = data.reduce((total, item) => {
-        // Skip folders and sum file sizes
-        return total + (item.metadata?.size || 0);
-      }, 0);
-      
-      totalStorage += bucketSize;
-      bucketsUsage[bucketName] = {
-        size: bucketSize,
-        files: data.filter(item => !item.id.endsWith('/')).length
-      };
-    }
-    
-    // Calculate percentage of free tier used
-    const totalStoragePercent = (totalStorage / FREE_TIER_LIMITS.TOTAL_STORAGE) * 100;
-    
-    return {
-      totalStorage,
-      totalStoragePercent,
-      bucketsUsage
-    };
-  } catch (error: any) {
-    console.error('Error getting free tier usage:', error);
-    return { error: error.message || 'Failed to get usage statistics' };
-  }
-};
-
 // Check if storage is connected
 export const isStorageConnected = async (): Promise<boolean> => {
   try {
-    // Check if user is authenticated and can list buckets
-    const { data, error } = await supabase.storage.listBuckets();
-    return !error && Array.isArray(data);
+    // Check if we can list buckets
+    const buckets = await getBuckets();
+    return buckets.length > 0;
   } catch (error) {
     return false;
   }
@@ -304,8 +210,8 @@ export const storage = {
   deleteFile,
   listFiles,
   getFileUrl,
-  getFreeTierUsage,
-  isStorageConnected
+  isStorageConnected,
+  getBuckets
 };
 
 export default storage;

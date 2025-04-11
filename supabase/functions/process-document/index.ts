@@ -77,6 +77,13 @@ const calculateFraudScore = (documentType: string): string => {
   return scores[Math.floor(Math.random() * scores.length)];
 };
 
+// CORS headers for cross-origin requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 // Create a Supabase client
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") || "",
@@ -88,11 +95,7 @@ Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      },
+      headers: corsHeaders,
       status: 204,
     });
   }
@@ -100,12 +103,14 @@ Deno.serve(async (req) => {
   // Handle POST requests only
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 405,
     });
   }
 
   try {
+    console.log("Processing document request");
+    
     // Parse form data
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -115,10 +120,12 @@ Deno.serve(async (req) => {
     if (!file || !applicationId || !documentType) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: file, applicationId, or documentType" }),
-        { headers: { "Content-Type": "application/json" }, status: 400 }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
+    console.log(`Processing document: ${file.name} for application: ${applicationId}, type: ${documentType}`);
+    
     // Read file buffer
     const fileBuffer = await file.arrayBuffer();
     
@@ -136,10 +143,25 @@ Deno.serve(async (req) => {
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `applications/${applicationId}/${documentType}/${fileName}`;
     
-    // Convert ArrayBuffer to Base64 for storage
-    const base64Data = Buffer.from(fileBuffer).toString('base64');
-    
-    // Store the file in Supabase Storage (mocked - in a real implementation you would use Storage API)
+    // Store file in Supabase Storage
+    try {
+      const { data: storageData, error: storageError } = await supabaseAdmin.storage
+        .from('applications')
+        .upload(filePath, fileBuffer, {
+          contentType: file.type,
+          cacheControl: '3600'
+        });
+        
+      if (storageError) {
+        console.error("Storage error:", storageError);
+        throw storageError;
+      }
+      
+      console.log("File uploaded to storage:", storageData?.path);
+    } catch (storageError) {
+      console.error("Error uploading to storage:", storageError);
+      // Continue processing even if storage fails
+    }
     
     // Insert document record in database
     const { data, error } = await supabaseAdmin
@@ -156,7 +178,23 @@ Deno.serve(async (req) => {
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error("Database error:", error);
+      throw error;
+    }
+    
+    console.log("Document processed successfully, ID:", data.id);
+    
+    // Update application with fraud score if needed
+    if (documentType === 'id' || documentType === 'address_proof') {
+      await supabaseAdmin
+        .from('mortgage_applications')
+        .update({ 
+          fraud_score: fraudScore,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', applicationId);
+    }
     
     return new Response(
       JSON.stringify({
@@ -165,13 +203,13 @@ Deno.serve(async (req) => {
         extractedFields,
         fraudScore
       }),
-      { headers: { "Content-Type": "application/json" }, status: 200 }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
     console.error("Error processing document:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Failed to process document" }),
-      { headers: { "Content-Type": "application/json" }, status: 500 }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });

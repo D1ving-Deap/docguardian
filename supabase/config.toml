@@ -1,33 +1,24 @@
 
+# A string used as a secret key for functions
 project_id = "spjkuuxxzlgljjtihwot"
 
 [api]
-enabled = true
+# Port to use for the API URL.
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+# Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
+# endpoints. public and storage are always included.
+schemas = ["public", "storage"]
+# Extra schemas to add to the search_path of every request. public is always included.
+extra_search_path = ["public", "extensions"]
+# Maximum rows returns in a single REST request. Defaults to 1000.
+max_rows = 1000
 
 [db]
+# Port to use for the local database URL.
 port = 54322
+# Port used by psql to connect to the database.
+major_version = 15
 
-[studio]
-enabled = true
-port = 54323
-
-[inbucket]
-enabled = true
-port = 54324
-
-[auth]
-enabled = true
-port = 54325
-
-[storage]
-enabled = true
-port = 54326
-
-[realtime]
-enabled = true
-port = 54327
-
+[functions]
 [functions.process-document]
 verify_jwt = false
