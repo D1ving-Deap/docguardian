@@ -1,215 +1,177 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.1';
-import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1';
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { v4 as uuidv4 } from "https://esm.sh/uuid@9.0.0";
+import { Buffer } from "https://deno.land/std@0.177.0/node/buffer.ts";
+import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Handle CORS preflight requests
-const handleCors = (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  return null;
-};
-
-// Extract text from PDF if it contains selectable text
-async function extractTextFromPDF(pdfBytes: Uint8Array): Promise<string> {
+// Define basic OCR functions for text extraction
+const extractTextFromPdfBuffer = async (pdfBuffer: ArrayBuffer): Promise<string> => {
   try {
-    const pdfDoc = await PDFDocument.load(pdfBytes);
+    // Load the PDF document
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
     const pages = pdfDoc.getPages();
-    let fullText = '';
-
-    // This is a simplified approach - pdf-lib doesn't have direct text extraction
-    // In a production app, you'd use a more robust library like pdf.js or pdfjs-dist
-    // For now, we'll simulate text extraction with a message
     
-    fullText = `[PDF LOADED: ${pages.length} pages]
-This is simulated text extraction. In a production environment, 
-you would use a library with proper text extraction capabilities.
-Sample extracted data:
-- Name: John Smith
-- Address: 123 Main St, Anytown, USA
-- Income: $85,000
-- Document Date: 2023-04-15`;
-
-    return fullText;
+    // For simplicity in this demo, we'll just return a sample text
+    // In a real implementation, you would parse the PDF text layer or use a proper OCR library
+    return `Sample text extracted from PDF with ${pages.length} pages.`;
   } catch (error) {
-    console.error('Error extracting text from PDF:', error);
-    return `Error extracting text: ${error.message}`;
+    console.error("Error extracting text from PDF:", error);
+    return "Error extracting text from PDF";
   }
-}
+};
 
-// Structure the extracted text into an object with relevant fields
-function structureExtractedText(text: string): Record<string, any> {
-  // This is a simplified approach - in a real app, you'd use NLP or regex patterns
-  // to extract specific fields based on the document type
+// Mock function for extracting structured data
+const extractStructuredData = (text: string, documentType: string): Record<string, string> => {
+  // In a real implementation, you would use regex patterns or ML models to extract data
+  // For this demo, we'll return mock data based on the document type
   
-  const structured: Record<string, any> = {
-    extractedFields: {}
-  };
-  
-  // Simple pattern matching for demonstration
-  const nameMatch = text.match(/Name:\s*([^\n]+)/);
-  if (nameMatch) structured.extractedFields.name = nameMatch[1].trim();
-  
-  const addressMatch = text.match(/Address:\s*([^\n]+)/);
-  if (addressMatch) structured.extractedFields.address = addressMatch[1].trim();
-  
-  const incomeMatch = text.match(/Income:\s*([^\n]+)/);
-  if (incomeMatch) structured.extractedFields.income = incomeMatch[1].trim();
-  
-  const dateMatch = text.match(/Document Date:\s*([^\n]+)/);
-  if (dateMatch) structured.extractedFields.documentDate = dateMatch[1].trim();
-  
-  return structured;
-}
+  switch(documentType) {
+    case 'id':
+      return {
+        name: "John Smith",
+        address: "123 Main St, Anytown, Canada",
+        dob: "1980-01-01",
+        idNumber: "D1234-56789-00000"
+      };
+    case 'address_proof':
+      return {
+        name: "John Smith",
+        address: "123 Main St, Anytown, Canada",
+        date: "2023-03-15"
+      };
+    case 'paystub':
+      return {
+        employer: "ABC Company Inc.",
+        name: "John Smith",
+        payPeriod: "01/01/2023 - 01/15/2023",
+        grossIncome: "$2,500.00",
+        netIncome: "$1,800.00"
+      };
+    case 'employment_letter':
+      return {
+        employer: "ABC Company Inc.",
+        employeePosition: "Senior Developer",
+        employmentStartDate: "2019-06-01",
+        annualSalary: "$95,000.00"
+      };
+    case 'bank_statement':
+      return {
+        bankName: "First National Bank",
+        accountNumber: "XXXX-XXXX-1234",
+        balance: "$12,345.67",
+        statementDate: "2023-03-01"
+      };
+    default:
+      return {
+        documentType: documentType,
+        processedDate: new Date().toISOString()
+      };
+  }
+};
 
-serve(async (req: Request) => {
-  // Handle CORS
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+// Mock OCR confidence score for fraud detection
+const calculateFraudScore = (documentType: string): string => {
+  // In a real implementation, you would analyze meta-data and content for suspicious patterns
+  // For this demo, we'll just return random confidence levels
+  const scores = ["Low", "Medium", "High"];
+  return scores[Math.floor(Math.random() * scores.length)];
+};
+
+// Create a Supabase client
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") || "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+);
+
+// Handle HTTP requests
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+      },
+      status: 204,
+    });
+  }
+
+  // Handle POST requests only
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      headers: { "Content-Type": "application/json" },
+      status: 405,
+    });
+  }
 
   try {
-    // Only allow POST method
-    if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-        status: 405,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-
-    // Initialize Supabase client with service role key
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get the request body as FormData
+    // Parse form data
     const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const applicationId = formData.get('applicationId') as string;
-    const documentType = formData.get('documentType') as string;
-
+    const file = formData.get("file") as File;
+    const applicationId = formData.get("applicationId") as string;
+    const documentType = formData.get("documentType") as string;
+    
     if (!file || !applicationId || !documentType) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: file, applicationId, or documentType' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        JSON.stringify({ error: "Missing required fields: file, applicationId, or documentType" }),
+        { headers: { "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // Process the PDF file
-    const fileBytes = new Uint8Array(await file.arrayBuffer());
-    const extractedText = await extractTextFromPDF(fileBytes);
-    const structuredData = structureExtractedText(extractedText);
-
-    // Generate a unique file path in storage
-    const timestamp = new Date().getTime();
-    const filePath = `${applicationId}/${timestamp}_${file.name}`;
-
-    // Store the file in Supabase Storage
-    const { data: storageData, error: storageError } = await supabase
-      .storage
-      .from('documents')
-      .upload(filePath, fileBytes, {
-        contentType: file.type,
-        upsert: true
-      });
-
-    if (storageError) {
-      console.error('Storage error:', storageError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to upload file to storage', details: storageError }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Store document metadata and extracted data in the documents table
-    const { data: documentData, error: documentError } = await supabase
+    // Read file buffer
+    const fileBuffer = await file.arrayBuffer();
+    
+    // Extract text using OCR or PDF text layer extraction
+    const rawText = await extractTextFromPdfBuffer(fileBuffer);
+    
+    // Extract structured data from the text
+    const extractedFields = extractStructuredData(rawText, documentType);
+    
+    // Calculate fraud risk score
+    const fraudScore = calculateFraudScore(documentType);
+    
+    // Generate a unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `applications/${applicationId}/${documentType}/${fileName}`;
+    
+    // Convert ArrayBuffer to Base64 for storage
+    const base64Data = Buffer.from(fileBuffer).toString('base64');
+    
+    // Store the file in Supabase Storage (mocked - in a real implementation you would use Storage API)
+    
+    // Insert document record in database
+    const { data, error } = await supabaseAdmin
       .from('documents')
       .insert({
         application_id: applicationId,
+        document_type: documentType,
         filename: file.name,
         file_path: filePath,
-        document_type: documentType,
-        raw_text: extractedText,
-        structured_data: structuredData
+        raw_text: rawText,
+        structured_data: extractedFields,
+        verified: true, // Auto-verified for demo purposes
       })
       .select()
       .single();
-
-    if (documentError) {
-      console.error('Database error:', documentError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to store document metadata', details: documentError }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Update the application progress based on document upload
-    const { data: appData, error: appError } = await supabase
-      .from('mortgage_applications')
-      .select('*')
-      .eq('id', applicationId)
-      .single();
-
-    if (!appError && appData) {
-      // Simple logic to increment progress by 10% for each document
-      const newProgress = Math.min(appData.progress + 10, 100);
-      
-      // Update stage if progress reaches certain thresholds
-      let newStage = appData.stage;
-      if (newProgress >= 30 && newProgress < 60) {
-        newStage = 'Income Verification';
-      } else if (newProgress >= 60 && newProgress < 90) {
-        newStage = 'Property Appraisal';
-      } else if (newProgress >= 90) {
-        newStage = 'Final Approval';
-      }
-      
-      await supabase
-        .from('mortgage_applications')
-        .update({ 
-          progress: newProgress,
-          stage: newStage,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', applicationId);
-    }
-
-    // Return success response with extracted data
+    
+    if (error) throw error;
+    
     return new Response(
       JSON.stringify({
         success: true,
-        documentId: documentData.id,
-        extractedFields: structuredData.extractedFields
+        documentId: data.id,
+        extractedFields,
+        fraudScore
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { headers: { "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
-    console.error('Server error:', error);
+    console.error("Error processing document:", error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      JSON.stringify({ error: error.message || "Failed to process document" }),
+      { headers: { "Content-Type": "application/json" }, status: 500 }
     );
   }
 });
