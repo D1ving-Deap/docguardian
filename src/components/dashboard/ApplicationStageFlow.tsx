@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { 
   AlertCircle, 
   CheckCircle, 
@@ -56,6 +56,34 @@ interface ApplicationData {
   fraud_score: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Schema definitions
+const getStartedSchema = z.object({
+  fullName: z.string().min(2, "Full name is required"),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().min(10, "Valid phone number required"),
+  maritalStatus: z.string().min(1, "Please select a marital status"),
+  dependants: z.string().min(1, "Please enter number of dependants")
+});
+
+const identitySchema = z.object({
+  sin: z.string().min(9, "Valid SIN required").max(9, "SIN must be 9 digits"),
+  dob: z.string().min(1, "Date of birth is required"),
+  currentAddress: z.string().min(1, "Current address is required"),
+  yearsAtAddress: z.string(),
+  housingStatus: z.string(),
+  monthlyPayment: z.string(),
+});
+
+// DocumentUpload Component Props
+interface DocumentUploadProps {
+  label: string;
+  description?: string;
+  acceptTypes?: string;
+  documentType: string;
+  applicationId: string;
+  onChange?: (documentId: string | null, extractedData?: any) => void;
 }
 
 const ApplicationStageFlow = () => {
@@ -371,6 +399,7 @@ const ApplicationStageFlow = () => {
   );
 };
 
+// DocumentUpload Component with OCR Processing
 const DocumentUpload = ({ 
   label, 
   description, 
@@ -452,7 +481,7 @@ const DocumentUpload = ({
       if (onChange) {
         onChange(result.documentId, result.extractedFields);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Document processing error:', error);
       toast({
         title: "Processing Failed",
@@ -562,6 +591,7 @@ const DocumentUpload = ({
   );
 };
 
+// Get Started Stage Component
 const GetStartedStage = ({ applicationId, clientData, onComplete }: { applicationId: string, clientData: any, onComplete: () => void }) => {
   const form = useForm<z.infer<typeof getStartedSchema>>({
     resolver: zodResolver(getStartedSchema),
@@ -703,6 +733,7 @@ const GetStartedStage = ({ applicationId, clientData, onComplete }: { applicatio
   );
 };
 
+// Identity Stage Component
 const IdentityStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
   const [idFrontId, setIdFrontId] = useState<string | null>(null);
@@ -922,6 +953,7 @@ const IdentityStage = ({ applicationId, onComplete }: { applicationId: string, o
   );
 };
 
+// Employment Stage Component with Document Upload
 const EmploymentStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
   const [paystubId, setPaystubId] = useState<string | null>(null);
@@ -969,179 +1001,4 @@ const EmploymentStage = ({ applicationId, onComplete }: { applicationId: string,
             </div>
           </div>
           
-          <div className="space-y-4">
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-2">Recent Paystub</h4>
-              <DocumentUpload 
-                label="Paystub"
-                description="Upload your most recent paystub"
-                documentType="paystub"
-                applicationId={applicationId}
-                onChange={handlePaystubUpload}
-              />
-            </div>
-            
-            <div className="border rounded-lg p-4">
-              <h4 className="font-medium mb-2">Employment Verification Letter</h4>
-              <DocumentUpload 
-                label="Employment Letter"
-                description="Upload an employment verification letter from your employer"
-                documentType="employment_letter"
-                applicationId={applicationId}
-                onChange={(docId) => setEmploymentLetterId(docId)}
-              />
-            </div>
-          </div>
-          
-          <Button 
-            onClick={handleSubmit}
-            className="w-full"
-          >
-            Continue to Assets <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const AssetsStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Assets & Liabilities (3-5 mins)</CardTitle>
-        <CardDescription>
-          Let's review your financial assets and liabilities.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-blue-700">
-                  Please upload your bank statements and other financial documents to verify your assets.
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            <DocumentUpload 
-              label="Bank Statements"
-              description="Upload your last 3 months of bank statements"
-              documentType="bank_statements"
-              applicationId={applicationId}
-            />
-          </div>
-          
-          <Button 
-            onClick={onComplete}
-            className="w-full"
-          >
-            Continue to Property <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const PropertyStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Property Information (3-5 mins)</CardTitle>
-        <CardDescription>
-          Tell us about the property you're financing.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-blue-700">
-                  Please provide details about the property you wish to purchase or refinance.
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            <DocumentUpload 
-              label="Property Documents"
-              description="Upload property information documents"
-              documentType="property_docs"
-              applicationId={applicationId}
-            />
-          </div>
-          
-          <Button 
-            onClick={onComplete}
-            className="w-full"
-          >
-            Continue to Final Review <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const FinalStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Final Declarations & Signatures (5-10 mins)</CardTitle>
-        <CardDescription>
-          Review and submit your complete mortgage application.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-blue-800 font-medium">Final Document Submission</p>
-                <p className="text-sm text-blue-700 mt-1">
-                  Please upload all required documents for your mortgage application. 
-                  Our system will securely process and verify these documents.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <DocumentUpload 
-              label="Application Consent Form"
-              description="Upload signed application consent document"
-              documentType="consent"
-              applicationId={applicationId}
-            />
-            
-            <DocumentUpload 
-              label="Additional Supporting Documents"
-              description="Optional: Upload any additional supporting documents"
-              documentType="supporting_docs"
-              applicationId={applicationId}
-            />
-          </div>
-
-          <Button 
-            type="button" 
-            onClick={onComplete} 
-            className="w-full"
-          >
-            Submit Final Application <CheckCircle className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-export default ApplicationStageFlow;
+          <div className="
