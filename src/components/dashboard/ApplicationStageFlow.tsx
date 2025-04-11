@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { useLocation } from "react-router-dom";
 import { 
   Card, 
@@ -732,8 +732,6 @@ const identitySchema = z.object({
   monthlyPayment: z.string(),
 });
 
-// The rest of the component definitions remain the same, but using the proper types
-// Keep existing code for IdentityStage, EmploymentStage, AssetsStage, PropertyStage, and FinalStage
 const IdentityStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
   const [idFrontId, setIdFrontId] = useState<string | null>(null);
@@ -997,3 +995,64 @@ const EmploymentStage = ({ applicationId, onComplete }: { applicationId: string,
               <p className="text-sm text-blue-700">
                 Please upload at least one of the following documents to verify your employment and income.
                 Our system will automatically extract
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const FinalStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Final Declarations & Signatures (5-10 mins)</CardTitle>
+        <CardDescription>
+          Review and submit your complete mortgage application.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-blue-800 font-medium">Final Document Submission</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Please upload all required documents for your mortgage application. 
+                  Our system will securely process and verify these documents.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <DocumentUpload 
+              label="Application Consent Form"
+              description="Upload signed application consent document"
+              documentType="consent"
+              applicationId={applicationId}
+            />
+            
+            <DocumentUpload 
+              label="Additional Supporting Documents"
+              description="Optional: Upload any additional supporting documents"
+              documentType="supporting_docs"
+              applicationId={applicationId}
+            />
+          </div>
+
+          <Button 
+            type="button" 
+            onClick={onComplete} 
+            className="w-full"
+          >
+            Submit Final Application <CheckCircle className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ApplicationStageFlow;
