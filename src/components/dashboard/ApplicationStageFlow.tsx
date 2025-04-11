@@ -1,5 +1,6 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { 
   Card, 
   CardContent, 
@@ -20,6 +21,7 @@ import {
   FormMessage 
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
@@ -37,15 +39,21 @@ import {
   X,
   Loader2,
   CheckCircle2,
-  AlertTriangle 
+  AlertTriangle,
+  FileUp
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { s3 } from "@/utils/awsStorage";
+import { supabase } from "@/integrations/supabase/client";
 
 const ApplicationStageFlow = () => {
   const [currentStage, setCurrentStage] = useState("get-started");
+  const [application, setApplication] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { search } = useLocation();
+  const applicationId = new URLSearchParams(search).get('id');
+  const { toast } = useToast();
   
   const stageIcons = {
     "get-started": <User className="h-5 w-5" />,
@@ -56,9 +64,162 @@ const ApplicationStageFlow = () => {
     "final": <ClipboardList className="h-5 w-5" />
   };
 
+  useEffect(() => {
+    if (applicationId) {
+      fetchApplication(applicationId);
+      
+      // Set up realtime subscription
+      const channel = supabase
+        .channel('schema-db-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'mortgage_applications',
+            filter: `id=eq.${applicationId}`
+          },
+          (payload) => {
+            if (payload.new) {
+              setApplication(payload.new);
+              updateStageBasedOnProgress(payload.new.progress);
+            }
+          }
+        )
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [applicationId]);
+  
+  const fetchApplication = async (id: string) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('mortgage_applications')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setApplication(data);
+        updateStageBasedOnProgress(data.progress);
+      }
+    } catch (error) {
+      console.error("Error fetching application:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load application details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const updateStageBasedOnProgress = (progress: number) => {
+    if (progress >= 0 && progress < 20) {
+      setCurrentStage("get-started");
+    } else if (progress >= 20 && progress < 40) {
+      setCurrentStage("identity");
+    } else if (progress >= 40 && progress < 60) {
+      setCurrentStage("employment");
+    } else if (progress >= 60 && progress < 80) {
+      setCurrentStage("assets");
+    } else if (progress >= 80 && progress < 90) {
+      setCurrentStage("property");
+    } else {
+      setCurrentStage("final");
+    }
+  };
+  
+  const updateApplicationProgress = async (stage: string, increment: number) => {
+    if (!applicationId) return;
+    
+    try {
+      // Get current application data
+      const { data, error } = await supabase
+        .from('mortgage_applications')
+        .select('progress, stage')
+        .eq('id', applicationId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        // Calculate new progress value
+        const newProgress = Math.min(data.progress + increment, 100);
+        
+        // Update the application
+        await supabase
+          .from('mortgage_applications')
+          .update({ 
+            progress: newProgress,
+            stage: stage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', applicationId);
+      }
+    } catch (error) {
+      console.error("Error updating application progress:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update application progress",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading application details...</span>
+      </div>
+    );
+  }
+  
+  if (!applicationId || !application) {
+    return (
+      <div className="container mx-auto py-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            No application ID provided or application not found. Please go back to the applications list and select an application.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-2xl font-bold mb-6">Mortgage Application</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Mortgage Application: {application.client_name}</h1>
+        <div className="text-sm text-muted-foreground">
+          Application ID: {applicationId}
+        </div>
+      </div>
+      
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium">Application Progress</span>
+          <span className="text-sm">{application.progress}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div 
+            className="bg-primary h-2.5 rounded-full" 
+            style={{ width: `${application.progress}%` }}
+          ></div>
+        </div>
+      </div>
       
       <Tabs value={currentStage} className="w-full">
         <TabsList className="grid grid-cols-6 mb-8">
@@ -114,61 +275,114 @@ const ApplicationStageFlow = () => {
 
         {/* Stage 1: Get Started */}
         <TabsContent value="get-started">
-          <GetStartedStage onComplete={() => setCurrentStage("identity")} />
+          <GetStartedStage 
+            applicationId={applicationId} 
+            clientData={{
+              fullName: application.client_name,
+              email: application.email
+            }}
+            onComplete={() => {
+              updateApplicationProgress("Identity Verification", 20);
+              setCurrentStage("identity");
+            }} 
+          />
         </TabsContent>
 
         {/* Stage 2: Identity & Residency */}
         <TabsContent value="identity">
-          <IdentityStage onComplete={() => setCurrentStage("employment")} />
+          <IdentityStage 
+            applicationId={applicationId} 
+            onComplete={() => {
+              updateApplicationProgress("Employment Verification", 20);
+              setCurrentStage("employment");
+            }} 
+          />
         </TabsContent>
 
         {/* Stage 3: Employment & Income */}
         <TabsContent value="employment">
-          <EmploymentStage onComplete={() => setCurrentStage("assets")} />
+          <EmploymentStage 
+            applicationId={applicationId}
+            onComplete={() => {
+              updateApplicationProgress("Asset Verification", 20);
+              setCurrentStage("assets");
+            }} 
+          />
         </TabsContent>
 
         {/* Stage 4: Assets & Liabilities */}
         <TabsContent value="assets">
-          <AssetsStage onComplete={() => setCurrentStage("property")} />
+          <AssetsStage 
+            applicationId={applicationId}
+            onComplete={() => {
+              updateApplicationProgress("Property Verification", 20);
+              setCurrentStage("property");
+            }} 
+          />
         </TabsContent>
 
         {/* Stage 5: Property Info */}
         <TabsContent value="property">
-          <PropertyStage onComplete={() => setCurrentStage("final")} />
+          <PropertyStage 
+            applicationId={applicationId}
+            onComplete={() => {
+              updateApplicationProgress("Final Review", 10);
+              setCurrentStage("final");
+            }} 
+          />
         </TabsContent>
 
         {/* Stage 6: Final Declarations & Signatures */}
         <TabsContent value="final">
-          <FinalStage onComplete={() => console.log("Application completed")} />
+          <FinalStage 
+            applicationId={applicationId}
+            onComplete={() => {
+              updateApplicationProgress("Completed", 10);
+              
+              // Update application status to Approved
+              supabase
+                .from('mortgage_applications')
+                .update({ 
+                  status: 'Approved',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', applicationId);
+                
+              toast({
+                title: "Application Approved",
+                description: "Mortgage application has been successfully completed and approved",
+              });
+            }} 
+          />
         </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-// File Upload Component
-interface FileUploadProps {
+// DocumentUpload Component with OCR Processing
+interface DocumentUploadProps {
   label: string;
   description?: string;
   acceptTypes?: string;
-  bucket?: string;
-  folder?: string;
-  onChange?: (fileKey: string | null) => void;
+  documentType: string;
+  applicationId: string;
+  onChange?: (documentId: string | null, extractedData?: any) => void;
 }
 
-const FileUpload = ({ 
+const DocumentUpload = ({ 
   label, 
   description, 
-  acceptTypes = "image/*, application/pdf", 
-  bucket = "user-documents",
-  folder = "",
+  acceptTypes = "application/pdf", 
+  documentType,
+  applicationId,
   onChange 
-}: FileUploadProps) => {
+}: DocumentUploadProps) => {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedKey, setUploadedKey] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
+  const [extractedData, setExtractedData] = useState<any>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -184,89 +398,78 @@ const FileUpload = ({
         return;
       }
       
-      setFile(selectedFile);
-      
-      // Create preview for images
-      if (selectedFile.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setPreviewUrl(event.target?.result as string);
-        };
-        reader.readAsDataURL(selectedFile);
-      } else {
-        // For PDFs, show an icon instead
-        setPreviewUrl(null);
+      // Validate file type
+      if (!selectedFile.type.includes('pdf')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a PDF file",
+          variant: "destructive"
+        });
+        return;
       }
+      
+      setFile(selectedFile);
     }
   };
   
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !applicationId) return;
     
     setIsUploading(true);
     
-    // Check if AWS is connected
-    if (!s3.isAWSConnected()) {
-      toast({
-        title: "AWS not connected",
-        description: "Please connect to AWS in settings first",
-        variant: "destructive"
-      });
-      setIsUploading(false);
-      return;
-    }
-    
-    // Generate key with folder path
-    const key = folder ? `${folder}/${file.name}` : file.name;
-    
-    // Upload to S3
-    const result = await s3.uploadFile(file, bucket, key);
-    
-    if ('error' in result) {
-      toast({
-        title: "Upload failed",
-        description: result.error,
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Upload successful",
-        description: "File uploaded successfully"
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('applicationId', applicationId);
+      formData.append('documentType', documentType);
+      
+      // Call our edge function to process the document
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/process-document`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // No authorization header needed for this public function
+        }
       });
       
-      setUploadedKey(result.key);
-      if (onChange) onChange(result.key);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error processing document');
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Document Processed",
+        description: "File uploaded and processed successfully"
+      });
+      
+      setUploadedDocId(result.documentId);
+      setExtractedData(result.extractedFields);
+      
+      if (onChange) {
+        onChange(result.documentId, result.extractedFields);
+      }
+    } catch (error) {
+      console.error('Document processing error:', error);
+      toast({
+        title: "Processing Failed",
+        description: error.message || "Failed to process document",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
     }
-    
-    setIsUploading(false);
   };
   
   const handleRemove = async () => {
-    if (uploadedKey) {
-      // Delete from S3
-      const result = await s3.deleteFile(uploadedKey, bucket);
-      
-      if ('error' in result) {
-        toast({
-          title: "Removal failed",
-          description: result.error,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "File removed",
-          description: "File removed successfully"
-        });
-        
-        setFile(null);
-        setPreviewUrl(null);
-        setUploadedKey(null);
-        if (onChange) onChange(null);
-      }
-    } else {
-      // Just clear the selected file
-      setFile(null);
-      setPreviewUrl(null);
+    setFile(null);
+    setUploadedDocId(null);
+    setExtractedData(null);
+    
+    if (onChange) {
+      onChange(null);
     }
   };
   
@@ -277,12 +480,9 @@ const FileUpload = ({
       
       {!file ? (
         <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
-          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+          <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
           <p className="text-sm text-center text-muted-foreground mb-2">
-            {acceptTypes.includes('image') ? 'PNG, JPG' : ''} 
-            {acceptTypes.includes('image') && acceptTypes.includes('pdf') ? ' or ' : ''}
-            {acceptTypes.includes('pdf') ? 'PDF' : ''} 
-            {' '}up to 10MB
+            Upload PDF document for automatic text extraction
           </p>
           <input
             type="file"
@@ -293,7 +493,7 @@ const FileUpload = ({
           />
           <label htmlFor={`file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`}>
             <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-              <span>Choose File</span>
+              <span>Choose PDF File</span>
             </Button>
           </label>
         </div>
@@ -314,17 +514,7 @@ const FileUpload = ({
             </Button>
           </div>
           
-          {previewUrl && (
-            <div className="mb-3 flex justify-center">
-              <img 
-                src={previewUrl} 
-                alt="Preview" 
-                className="max-h-32 max-w-full rounded border"
-              />
-            </div>
-          )}
-          
-          {!uploadedKey ? (
+          {!uploadedDocId ? (
             <Button 
               onClick={handleUpload} 
               disabled={isUploading} 
@@ -334,19 +524,35 @@ const FileUpload = ({
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
+                  Processing...
                 </>
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload
+                  Process Document
                 </>
               )}
             </Button>
           ) : (
-            <div className="flex items-center text-green-600 text-sm">
-              <CheckCircle2 className="h-4 w-4 mr-1" />
-              Uploaded successfully
+            <div className="space-y-3">
+              <div className="flex items-center text-green-600 text-sm">
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Document processed successfully
+              </div>
+              
+              {extractedData && Object.keys(extractedData).length > 0 && (
+                <div className="mt-3 border rounded p-3 bg-gray-50">
+                  <h4 className="text-sm font-medium mb-2">Extracted Information</h4>
+                  <div className="space-y-1 text-sm">
+                    {Object.entries(extractedData).map(([key, value]) => (
+                      <div key={key} className="grid grid-cols-3 gap-2">
+                        <span className="text-gray-500 font-medium">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</span>
+                        <span className="col-span-2">{value as string}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -364,12 +570,12 @@ const getStartedSchema = z.object({
   dependants: z.string().min(1, "Please enter number of dependants")
 });
 
-const GetStartedStage = ({ onComplete }: { onComplete: () => void }) => {
+const GetStartedStage = ({ applicationId, clientData, onComplete }: { applicationId: string, clientData: any, onComplete: () => void }) => {
   const form = useForm<z.infer<typeof getStartedSchema>>({
     resolver: zodResolver(getStartedSchema),
     defaultValues: {
-      fullName: "",
-      email: "",
+      fullName: clientData?.fullName || "",
+      email: clientData?.email || "",
       phone: "",
       maritalStatus: "",
       dependants: "0"
@@ -378,8 +584,16 @@ const GetStartedStage = ({ onComplete }: { onComplete: () => void }) => {
 
   const onSubmit = (data: z.infer<typeof getStartedSchema>) => {
     console.log("Get Started data:", data);
-    // Save to localStorage for persistence
-    localStorage.setItem('application-data-personal', JSON.stringify(data));
+    // Save data to application
+    supabase
+      .from('mortgage_applications')
+      .update({
+        client_name: data.fullName,
+        email: data.email,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', applicationId);
+      
     onComplete();
   };
 
@@ -507,11 +721,11 @@ const identitySchema = z.object({
   monthlyPayment: z.string(),
 });
 
-const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
+const IdentityStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
-  const [idFrontKey, setIdFrontKey] = useState<string | null>(null);
-  const [idBackKey, setIdBackKey] = useState<string | null>(null);
-  const [addressProofKey, setAddressProofKey] = useState<string | null>(null);
+  const [idFrontId, setIdFrontId] = useState<string | null>(null);
+  const [idFrontData, setIdFrontData] = useState<any>(null);
+  const [addressProofId, setAddressProofId] = useState<string | null>(null);
   
   const form = useForm<z.infer<typeof identitySchema>>({
     resolver: zodResolver(identitySchema),
@@ -527,7 +741,7 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
 
   const onSubmit = (data: z.infer<typeof identitySchema>) => {
     // Check if required documents are uploaded
-    if (!idFrontKey || !idBackKey || !addressProofKey) {
+    if (!idFrontId || !addressProofId) {
       toast({
         title: "Missing documents",
         description: "Please upload all required documents",
@@ -537,19 +751,23 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
     }
     
     console.log("Identity data:", data);
-    console.log("Document keys:", { idFrontKey, idBackKey, addressProofKey });
-    
-    // Save to localStorage for persistence
-    localStorage.setItem('application-data-identity', JSON.stringify({
-      ...data,
-      documents: {
-        idFront: idFrontKey,
-        idBack: idBackKey,
-        addressProof: addressProofKey
-      }
-    }));
-    
     onComplete();
+  };
+
+  const handleIdUpload = (docId: string | null, extractedData?: any) => {
+    setIdFrontId(docId);
+    if (extractedData) {
+      setIdFrontData(extractedData);
+      
+      // Auto-fill form with extracted data if available
+      if (extractedData.name) {
+        form.setValue('sin', '123456789'); // Dummy SIN for demo
+      }
+      
+      if (extractedData.address) {
+        form.setValue('currentAddress', extractedData.address);
+      }
+    }
   };
 
   return (
@@ -565,14 +783,10 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
           <div className="flex">
             <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
             <div>
-              <p className="text-sm text-blue-800 font-medium">AWS S3 Storage</p>
+              <p className="text-sm text-blue-800 font-medium">Document Processing</p>
               <p className="text-sm text-blue-700 mt-1">
-                Your documents will be securely uploaded and stored in Amazon S3.
-                {!s3.isAWSConnected() && (
-                  <span className="font-medium text-amber-600 block mt-1">
-                    Please connect to AWS in settings first to enable document upload.
-                  </span>
-                )}
+                Upload your identification documents below. Our system will automatically extract information
+                to speed up your application process.
               </p>
             </div>
           </div>
@@ -692,36 +906,23 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
               
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">ID Document (Driver's License or Passport)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FileUpload 
-                    label="Front of ID"
-                    description="Clear photo of the front of your ID"
-                    acceptTypes="image/*"
-                    bucket="user-documents"
-                    folder="identity"
-                    onChange={setIdFrontKey}
-                  />
-                  
-                  <FileUpload 
-                    label="Back of ID"
-                    description="Clear photo of the back of your ID"
-                    acceptTypes="image/*"
-                    bucket="user-documents"
-                    folder="identity"
-                    onChange={setIdBackKey}
-                  />
-                </div>
+                <DocumentUpload 
+                  label="ID Document"
+                  description="Upload your ID as a PDF document"
+                  documentType="id"
+                  applicationId={applicationId}
+                  onChange={handleIdUpload}
+                />
               </div>
               
               <div className="border rounded-lg p-4">
                 <h4 className="font-medium mb-2">Address Proof (Utility Bill or Bank Statement)</h4>
-                <FileUpload 
+                <DocumentUpload 
                   label="Address Proof Document"
-                  description="Recent utility bill or bank statement showing your address"
-                  acceptTypes="image/*, application/pdf"
-                  bucket="user-documents"
-                  folder="identity"
-                  onChange={setAddressProofKey}
+                  description="Upload a document showing your current address"
+                  documentType="address_proof"
+                  applicationId={applicationId}
+                  onChange={(docId) => setAddressProofId(docId)}
                 />
               </div>
             </div>
@@ -729,21 +930,9 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
             <Button 
               type="submit" 
               className="w-full"
-              disabled={!s3.isAWSConnected()}
             >
               Continue to Employment <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            
-            {!s3.isAWSConnected() && (
-              <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
-                <div className="flex">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
-                  <p className="text-sm text-amber-800">
-                    AWS connection required. Please connect to AWS in settings to enable document uploads.
-                  </p>
-                </div>
-              </div>
-            )}
           </form>
         </Form>
       </CardContent>
@@ -751,18 +940,16 @@ const IdentityStage = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-// Placeholder components for the remaining stages
-// These would be implemented similarly to the above components with document upload functionality
-
-const EmploymentStage = ({ onComplete }: { onComplete: () => void }) => {
+// Employment Stage Component with Document Upload
+const EmploymentStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
-  const [paystub1Key, setPaystub1Key] = useState<string | null>(null);
-  const [paystub2Key, setPaystub2Key] = useState<string | null>(null);
-  const [employmentLetterKey, setEmploymentLetterKey] = useState<string | null>(null);
+  const [paystubId, setPaystubId] = useState<string | null>(null);
+  const [paystubData, setPaystubData] = useState<any>(null);
+  const [employmentLetterId, setEmploymentLetterId] = useState<string | null>(null);
   
   const handleSubmit = () => {
     // Check if at least one document is uploaded
-    if (!paystub1Key && !paystub2Key && !employmentLetterKey) {
+    if (!paystubId && !employmentLetterId) {
       toast({
         title: "Missing documents",
         description: "Please upload at least one employment document",
@@ -771,16 +958,14 @@ const EmploymentStage = ({ onComplete }: { onComplete: () => void }) => {
       return;
     }
     
-    // Save document keys to localStorage
-    localStorage.setItem('application-data-employment', JSON.stringify({
-      documents: {
-        paystub1: paystub1Key,
-        paystub2: paystub2Key,
-        employmentLetter: employmentLetterKey
-      }
-    }));
-    
     onComplete();
+  };
+  
+  const handlePaystubUpload = (docId: string | null, extractedData?: any) => {
+    setPaystubId(docId);
+    if (extractedData) {
+      setPaystubData(extractedData);
+    }
   };
   
   return (
@@ -798,71 +983,50 @@ const EmploymentStage = ({ onComplete }: { onComplete: () => void }) => {
               <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
               <p className="text-sm text-blue-700">
                 Please upload at least one of the following documents to verify your employment and income.
+                Our system will automatically extract key information to speed up your application.
               </p>
             </div>
           </div>
           
           <div className="space-y-4">
-            <FileUpload 
-              label="Pay Stub (Last Month)"
+            <DocumentUpload 
+              label="Pay Stub"
               description="Recent pay stub showing your income"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="employment"
-              onChange={setPaystub1Key}
+              documentType="paystub"
+              applicationId={applicationId}
+              onChange={handlePaystubUpload}
             />
             
-            <FileUpload 
-              label="Pay Stub (Previous Month)"
-              description="Pay stub from the previous month"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="employment"
-              onChange={setPaystub2Key}
-            />
-            
-            <FileUpload 
+            <DocumentUpload 
               label="Employment Letter"
               description="Letter from your employer confirming your position and income"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="employment"
-              onChange={setEmploymentLetterKey}
+              documentType="employment_letter"
+              applicationId={applicationId}
+              onChange={(docId) => setEmploymentLetterId(docId)}
             />
           </div>
           
           <Button 
             onClick={handleSubmit} 
             className="w-full"
-            disabled={!s3.isAWSConnected()}
           >
             Continue to Assets <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          
-          {!s3.isAWSConnected() && (
-            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
-              <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
-                <p className="text-sm text-amber-800">
-                  AWS connection required. Please connect to AWS in settings to enable document uploads.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const AssetsStage = ({ onComplete }: { onComplete: () => void }) => {
+// Assets Stage Component
+const AssetsStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
-  const [bankStatementKey, setBankStatementKey] = useState<string | null>(null);
-  const [investmentStatementKey, setInvestmentStatementKey] = useState<string | null>(null);
+  const [bankStatementId, setBankStatementId] = useState<string | null>(null);
+  const [investmentStatementId, setInvestmentStatementId] = useState<string | null>(null);
   
   const handleSubmit = () => {
     // Check if at least one document is uploaded
-    if (!bankStatementKey && !investmentStatementKey) {
+    if (!bankStatementId && !investmentStatementId) {
       toast({
         title: "Missing documents",
         description: "Please upload at least one financial document",
@@ -870,14 +1034,6 @@ const AssetsStage = ({ onComplete }: { onComplete: () => void }) => {
       });
       return;
     }
-    
-    // Save document keys to localStorage
-    localStorage.setItem('application-data-assets', JSON.stringify({
-      documents: {
-        bankStatement: bankStatementKey,
-        investmentStatement: investmentStatementKey
-      }
-    }));
     
     onComplete();
   };
@@ -897,70 +1053,49 @@ const AssetsStage = ({ onComplete }: { onComplete: () => void }) => {
               <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
               <p className="text-sm text-blue-700">
                 Please upload documents showing your financial assets and liabilities.
+                Our system will automatically analyze these documents.
               </p>
             </div>
           </div>
           
           <div className="space-y-4">
-            <FileUpload 
+            <DocumentUpload 
               label="Bank Statement"
               description="Recent bank statement showing your balances"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="assets"
-              onChange={setBankStatementKey}
+              documentType="bank_statement"
+              applicationId={applicationId}
+              onChange={(docId) => setBankStatementId(docId)}
             />
             
-            <FileUpload 
+            <DocumentUpload 
               label="Investment Statement"
               description="RRSP, TFSA or other investment account statements"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="assets"
-              onChange={setInvestmentStatementKey}
+              documentType="investment_statement"
+              applicationId={applicationId}
+              onChange={(docId) => setInvestmentStatementId(docId)}
             />
           </div>
           
           <Button 
             onClick={handleSubmit} 
             className="w-full"
-            disabled={!s3.isAWSConnected()}
           >
             Continue to Property Info <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          
-          {!s3.isAWSConnected() && (
-            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
-              <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
-                <p className="text-sm text-amber-800">
-                  AWS connection required. Please connect to AWS in settings to enable document uploads.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const PropertyStage = ({ onComplete }: { onComplete: () => void }) => {
+// Property Stage Component
+const PropertyStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
-  const [propertyTaxKey, setPropertyTaxKey] = useState<string | null>(null);
-  const [mortgageStatementKey, setMortgageStatementKey] = useState<string | null>(null);
+  const [propertyTaxId, setPropertyTaxId] = useState<string | null>(null);
+  const [mortgageStatementId, setMortgageStatementId] = useState<string | null>(null);
   
   const handleSubmit = () => {
     // For property, documents might be optional if they don't own property
-    
-    // Save document keys to localStorage
-    localStorage.setItem('application-data-property', JSON.stringify({
-      documents: {
-        propertyTax: propertyTaxKey,
-        mortgageStatement: mortgageStatementKey
-      }
-    }));
-    
     onComplete();
   };
   
@@ -984,53 +1119,40 @@ const PropertyStage = ({ onComplete }: { onComplete: () => void }) => {
           </div>
           
           <div className="space-y-4">
-            <FileUpload 
+            <DocumentUpload 
               label="Property Tax Bill"
               description="Most recent property tax assessment"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="property"
-              onChange={setPropertyTaxKey}
+              documentType="property_tax"
+              applicationId={applicationId}
+              onChange={(docId) => setPropertyTaxId(docId)}
             />
             
-            <FileUpload 
+            <DocumentUpload 
               label="Mortgage Statement"
               description="Recent mortgage statement showing balance and payment"
-              acceptTypes="image/*, application/pdf"
-              bucket="user-documents"
-              folder="property"
-              onChange={setMortgageStatementKey}
+              documentType="mortgage_statement"
+              applicationId={applicationId}
+              onChange={(docId) => setMortgageStatementId(docId)}
             />
           </div>
           
           <Button 
             onClick={handleSubmit} 
             className="w-full"
-            disabled={!s3.isAWSConnected()}
           >
             Continue to Final Step <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-          
-          {!s3.isAWSConnected() && (
-            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
-              <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
-                <p className="text-sm text-amber-800">
-                  AWS connection required. Please connect to AWS in settings to enable document uploads.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const FinalStage = ({ onComplete }: { onComplete: () => void }) => {
+// Final Stage Component
+const FinalStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
   const { toast } = useToast();
   const [consent, setConsent] = useState(false);
-  const [signatureKey, setSignatureKey] = useState<string | null>(null);
+  const [signatureId, setSignatureId] = useState<string | null>(null);
   
   const handleSubmit = () => {
     if (!consent) {
@@ -1041,19 +1163,6 @@ const FinalStage = ({ onComplete }: { onComplete: () => void }) => {
       });
       return;
     }
-    
-    // Save document keys to localStorage
-    localStorage.setItem('application-data-final', JSON.stringify({
-      consent,
-      documents: {
-        signature: signatureKey
-      }
-    }));
-    
-    toast({
-      title: "Application Complete",
-      description: "Your mortgage application has been submitted successfully",
-    });
     
     onComplete();
   };
@@ -1090,34 +1199,22 @@ const FinalStage = ({ onComplete }: { onComplete: () => void }) => {
           
           <div className="border rounded-lg p-4">
             <h3 className="font-medium mb-2">Digital Signature</h3>
-            <FileUpload 
-              label="Upload Signature"
-              description="Upload an image of your signature"
-              acceptTypes="image/*"
-              bucket="user-documents"
-              folder="signatures"
-              onChange={setSignatureKey}
+            <DocumentUpload 
+              label="Upload Signature Document"
+              description="Upload a signed document or consent form"
+              documentType="signature"
+              applicationId={applicationId}
+              onChange={(docId) => setSignatureId(docId)}
             />
           </div>
           
           <Button 
             onClick={handleSubmit} 
             className="w-full"
-            disabled={!consent || (!signatureKey && s3.isAWSConnected())}
+            disabled={!consent}
           >
             Submit Application <CheckCircle className="ml-2 h-4 w-4" />
           </Button>
-          
-          {!s3.isAWSConnected() && (
-            <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
-              <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mr-2 flex-shrink-0" />
-                <p className="text-sm text-amber-800">
-                  AWS connection required. Please connect to AWS in settings to enable document uploads.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>

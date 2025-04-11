@@ -1,24 +1,75 @@
 
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 
 const DashboardOverview = () => {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, refetch } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      // In a real app, we'd fetch these stats from the database
-      // For now, we'll use mock data
+      // Get real stats from the database
+      const { data: applications, error: appError } = await supabase
+        .from('mortgage_applications')
+        .select('id, status, stage');
+        
+      if (appError) throw appError;
+      
+      const { data: documents, error: docsError } = await supabase
+        .from('documents')
+        .select('id, verified');
+        
+      if (docsError) throw docsError;
+      
+      // Calculate stats
+      const totalApplications = applications?.length || 0;
+      const pendingVerification = applications?.filter(app => 
+        app.stage === 'Document Verification' || app.status === 'Pending'
+      ).length || 0;
+      const completedVerifications = documents?.filter(doc => doc.verified).length || 0;
+      
+      // For demonstration, we'll set a random number for fraud alerts
+      const fraudAlerts = Math.floor(Math.random() * 3);
+      
       return {
-        totalApplications: 24,
-        pendingVerification: 8,
-        completedVerifications: 16,
-        fraudAlerts: 3,
+        totalApplications,
+        pendingVerification,
+        completedVerifications,
+        fraudAlerts,
         averageProcessingTime: "2.4 min",
       };
     },
   });
+
+  useEffect(() => {
+    // Set up realtime subscription to update stats when data changes
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'mortgage_applications'
+        },
+        () => refetch()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'documents'
+        },
+        () => refetch()
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   return (
     <div className="space-y-6">
