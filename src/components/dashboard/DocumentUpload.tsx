@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -65,11 +64,13 @@ const DocumentUpload = ({
     
     try {
       // First, upload the file to Supabase Storage
-      const filePath = `applications/${applicationId}/${documentType}`;
+      // Generate a more sanitized key
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = `${applicationId}/${documentType}`;
       const uploadResult = await storage.uploadFile(
         file,
         'applications',
-        `${filePath}/${file.name}`
+        filePath + '/' + safeName
       );
       
       if ('error' in uploadResult) {
@@ -81,6 +82,9 @@ const DocumentUpload = ({
       formData.append('file', file);
       formData.append('applicationId', applicationId);
       formData.append('documentType', documentType);
+      formData.append('filePath', uploadResult.key);
+      
+      console.log(`Uploaded to ${uploadResult.key}, calling edge function...`);
       
       // Call our edge function to process the document
       const response = await fetch(`${supabaseUrl}/functions/v1/process-document`, {

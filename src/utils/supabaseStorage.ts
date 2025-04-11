@@ -1,3 +1,4 @@
+
 // Supabase Storage Utility
 // This utility provides S3-like methods for uploading, retrieving, and deleting files
 // using Supabase Storage instead of AWS S3
@@ -36,6 +37,14 @@ const FREE_TIER_LIMITS = {
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
 };
 
+// Sanitize filename to be storage-friendly
+const sanitizeFileName = (fileName: string): string => {
+  // Remove special characters, spaces replaced with underscores
+  return fileName
+    .replace(/[^a-zA-Z0-9.-]/g, '_')  // Replace special chars with underscore
+    .replace(/_{2,}/g, '_');          // Replace multiple underscores with single one
+};
+
 // Upload file to Supabase Storage
 export const uploadFile = async (
   file: File, 
@@ -56,12 +65,18 @@ export const uploadFile = async (
     }
     
     // Generate a key if not provided
-    const fileKey = key || `${uuidv4()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const sanitizedFileName = sanitizeFileName(file.name);
+    const fileKey = key || `${uuidv4()}-${sanitizedFileName}`;
+    
+    // Make sure the key itself is sanitized
+    const sanitizedKey = sanitizeFileName(fileKey);
+    
+    console.log(`Uploading file to ${bucket}/${sanitizedKey}`);
     
     // Upload file to Supabase Storage
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileKey, file, {
+      .upload(sanitizedKey, file, {
         cacheControl: '3600',
         upsert: false,
         contentType: file.type,
@@ -76,10 +91,10 @@ export const uploadFile = async (
     // Get public URL if successful
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
-      .getPublicUrl(fileKey);
+      .getPublicUrl(sanitizedKey);
     
     return {
-      key: fileKey,
+      key: sanitizedKey,
       url: publicUrl
     };
   } catch (error: any) {
