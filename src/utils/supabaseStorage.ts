@@ -1,4 +1,3 @@
-
 // Supabase Storage Utility
 // This utility provides S3-like methods for uploading, retrieving, and deleting files
 // using Supabase Storage instead of AWS S3
@@ -203,6 +202,56 @@ export const isStorageConnected = async (): Promise<boolean> => {
   }
 };
 
+// Get free tier usage
+export const getFreeTierUsage = async (): Promise<{
+  totalStorage: number;
+  totalStoragePercent: number;
+  bucketsUsage: Record<string, { size: number, files: number }>;
+} | { error: string }> => {
+  try {
+    // Get all buckets
+    const buckets = await getBuckets();
+    
+    // Calculate total storage and files per bucket
+    let totalStorage = 0;
+    const bucketsUsage: Record<string, { size: number, files: number }> = {};
+    
+    // Process each bucket
+    for (const bucketName of buckets) {
+      // Get files in bucket
+      const listResult = await listFiles(bucketName);
+      
+      if ('error' in listResult) {
+        console.error(`Error listing files in bucket ${bucketName}:`, listResult.error);
+        continue;
+      }
+      
+      // Calculate bucket usage
+      const files = listResult.files;
+      const bucketSize = files.reduce((sum, file) => sum + file.size, 0);
+      
+      // Update totals
+      totalStorage += bucketSize;
+      bucketsUsage[bucketName] = {
+        size: bucketSize,
+        files: files.length
+      };
+    }
+    
+    // Calculate percentage of free tier used
+    const totalStoragePercent = (totalStorage / FREE_TIER_LIMITS.TOTAL_STORAGE) * 100;
+    
+    return {
+      totalStorage,
+      totalStoragePercent,
+      bucketsUsage
+    };
+  } catch (error: any) {
+    console.error('Error calculating free tier usage:', error);
+    return { error: error.message || 'Failed to calculate storage usage' };
+  }
+};
+
 // For easy imports in other files
 export const storage = {
   uploadFile,
@@ -211,7 +260,8 @@ export const storage = {
   listFiles,
   getFileUrl,
   isStorageConnected,
-  getBuckets
+  getBuckets,
+  getFreeTierUsage
 };
 
 export default storage;

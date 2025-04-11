@@ -38,7 +38,7 @@ const AWSIntegration = () => {
         
         // Get usage stats
         const usageResult = await storage.getFreeTierUsage();
-        if ('totalStorage' in usageResult) {
+        if (usageResult && !('error' in usageResult)) {
           const { totalStorage } = usageResult;
           const remainingStorage = Math.max(0, 5 * 1024 * 1024 * 1024 - totalStorage);
           setFreeUsageRemaining({
