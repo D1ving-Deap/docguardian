@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation } from "react-router-dom";
 import { 
@@ -1001,4 +1002,294 @@ const EmploymentStage = ({ applicationId, onComplete }: { applicationId: string,
             </div>
           </div>
           
-          <div className="
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium mb-2">Recent Paystubs (last 2-3 pay periods)</h4>
+              <DocumentUpload 
+                label="Paystub"
+                description="Upload your most recent paystub as a PDF document"
+                documentType="paystub"
+                applicationId={applicationId}
+                onChange={handlePaystubUpload}
+              />
+            </div>
+            
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium mb-2">Employment Verification Letter</h4>
+              <DocumentUpload 
+                label="Employment Letter"
+                description="Upload an employment verification letter from your employer"
+                documentType="employment_letter"
+                applicationId={applicationId}
+                onChange={(docId) => setEmploymentLetterId(docId)}
+              />
+            </div>
+          </div>
+          
+          <Button 
+            onClick={handleSubmit}
+            className="w-full"
+          >
+            Continue to Assets <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Assets Stage Component
+const AssetsStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [bankStatementId, setBankStatementId] = useState<string | null>(null);
+  const [investmentStatementId, setInvestmentStatementId] = useState<string | null>(null);
+  
+  const handleSubmit = () => {
+    // Check if at least one document is uploaded
+    if (!bankStatementId) {
+      toast({
+        title: "Missing documents",
+        description: "Please upload your bank statements",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    onComplete();
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Assets & Liabilities (3-5 mins)</CardTitle>
+        <CardDescription>
+          Let's verify your assets and financial capacity.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <p className="text-sm text-blue-700">
+                Please upload your bank statements and any investment account statements.
+                Our system will automatically analyze your financial capacity.
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium mb-2">Bank Statements (last 3 months)</h4>
+              <DocumentUpload 
+                label="Bank Statement"
+                description="Upload your last 3 months of bank statements"
+                documentType="bank_statement"
+                applicationId={applicationId}
+                onChange={(docId) => setBankStatementId(docId)}
+              />
+            </div>
+            
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium mb-2">Investment Account Statements (optional)</h4>
+              <DocumentUpload 
+                label="Investment Statement"
+                description="Upload your investment account statements if applicable"
+                documentType="investment_statement"
+                applicationId={applicationId}
+                onChange={(docId) => setInvestmentStatementId(docId)}
+              />
+            </div>
+          </div>
+          
+          <Button 
+            onClick={handleSubmit}
+            className="w-full"
+          >
+            Continue to Property <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Property Stage Component
+const PropertyStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
+  const { toast } = useToast();
+  const [propertyDocId, setPropertyDocId] = useState<string | null>(null);
+  
+  const propertyForm = useForm({
+    defaultValues: {
+      propertyAddress: "",
+      propertyType: "",
+      purchasePrice: "",
+      downPayment: ""
+    }
+  });
+  
+  const onSubmit = (data: any) => {
+    console.log("Property data:", data);
+    onComplete();
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Property Information (2-3 mins)</CardTitle>
+        <CardDescription>
+          Tell us about the property you're interested in purchasing.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <Form {...propertyForm}>
+            <form onSubmit={propertyForm.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={propertyForm.control}
+                name="propertyAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Property Address</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123 Main St, City, Province" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={propertyForm.control}
+                name="propertyType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Property Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select property type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="single-family">Single Family Home</SelectItem>
+                        <SelectItem value="condo">Condominium</SelectItem>
+                        <SelectItem value="townhouse">Townhouse</SelectItem>
+                        <SelectItem value="multi-family">Multi-Family Home</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={propertyForm.control}
+                  name="purchasePrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="500000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={propertyForm.control}
+                  name="downPayment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Down Payment ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="100000" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium mb-2">Property Documentation (if available)</h4>
+                <DocumentUpload 
+                  label="Property Documents"
+                  description="Upload any available property documentation (listing, appraisal, etc.)"
+                  documentType="property_doc"
+                  applicationId={applicationId}
+                  onChange={(docId) => setPropertyDocId(docId)}
+                />
+              </div>
+              
+              <Button 
+                type="submit" 
+                className="w-full"
+              >
+                Continue to Final Review <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </form>
+          </Form>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const FinalStage = ({ applicationId, onComplete }: { applicationId: string, onComplete: () => void }) => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Final Declarations & Signatures (5-10 mins)</CardTitle>
+        <CardDescription>
+          Review and submit your complete mortgage application.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div className="rounded-md bg-blue-50 border border-blue-100 p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+              <div>
+                <p className="text-sm text-blue-800 font-medium">Final Document Submission</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Please upload all required documents for your mortgage application. 
+                  Our system will securely process and verify these documents.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <DocumentUpload 
+              label="Application Consent Form"
+              description="Upload signed application consent document"
+              documentType="consent"
+              applicationId={applicationId}
+            />
+            
+            <DocumentUpload 
+              label="Additional Supporting Documents"
+              description="Optional: Upload any additional supporting documents"
+              documentType="supporting_docs"
+              applicationId={applicationId}
+            />
+          </div>
+
+          <Button 
+            type="button" 
+            onClick={onComplete} 
+            className="w-full"
+          >
+            Submit Final Application <CheckCircle className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ApplicationStageFlow;
