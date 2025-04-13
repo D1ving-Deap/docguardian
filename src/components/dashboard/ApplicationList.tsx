@@ -1,11 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, FileText } from "lucide-react";
+import { PlusCircle, FileText, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -34,6 +35,8 @@ const ApplicationList = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [applicationToDelete, setApplicationToDelete] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -75,6 +78,7 @@ const ApplicationList = () => {
       const { data, error } = await supabase
         .from('mortgage_applications')
         .select('*')
+        .is('deleted_at', null) // Only fetch non-deleted applications
         .order('created_at', { ascending: false });
         
       if (error) {
@@ -135,6 +139,49 @@ const ApplicationList = () => {
     }
   };
 
+  const confirmDelete = (appId: string) => {
+    setApplicationToDelete(appId);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const deleteApplication = async () => {
+    if (!applicationToDelete) return;
+    
+    try {
+      // Soft delete the application by setting the deleted_at timestamp
+      const { error } = await supabase
+        .from('mortgage_applications')
+        .update({ 
+          deleted_at: new Date().toISOString(),
+          status: 'Deleted'
+        })
+        .eq('id', applicationToDelete);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Application has been deleted",
+      });
+      
+      // Remove the deleted application from the local state
+      setApplications(applications.filter(app => app.id !== applicationToDelete));
+      
+    } catch (error) {
+      console.error("Error deleting application:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete application",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setApplicationToDelete(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'approved':
@@ -187,8 +234,14 @@ const ApplicationList = () => {
                   </div>
                   
                   {app.fraud_score && (
-                    <div className="text-sm">
-                      <span className="font-medium">Fraud Score:</span> {app.fraud_score}
+                    <div className="text-sm flex items-center">
+                      <span className="font-medium">Fraud Score:</span> 
+                      <span className="ml-1 flex items-center">
+                        {app.fraud_score} 
+                        {app.fraud_score === 'High' && (
+                          <AlertTriangle className="ml-1 h-4 w-4 text-red-500" />
+                        )}
+                      </span>
                     </div>
                   )}
                   
@@ -196,14 +249,23 @@ const ApplicationList = () => {
                     Created on {new Date(app.created_at).toLocaleDateString()}
                   </div>
                   
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-2"
-                    onClick={() => handleViewDetails(app.id)}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Details
-                  </Button>
+                  <div className="flex gap-2 mt-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleViewDetails(app.id)}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="p-0 h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => confirmDelete(app.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -269,6 +331,32 @@ const ApplicationList = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Application</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this application? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={deleteApplication}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

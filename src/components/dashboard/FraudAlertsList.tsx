@@ -1,8 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface FraudAlert {
   id: string;
@@ -10,8 +12,10 @@ interface FraudAlert {
   issue: string;
   severity: string;
   created_at: string;
+  resolved: boolean;
   document?: {
     document_type: string;
+    application_id?: string;
     application?: {
       client_name: string;
     }
@@ -19,37 +23,70 @@ interface FraudAlert {
 }
 
 const FraudAlertsList = () => {
-  // Mock data until the Supabase schema is properly set up
-  const [alerts, setAlerts] = useState<FraudAlert[]>([
-    {
-      id: "alert-001",
-      document_id: "doc-001",
-      issue: "Metadata inconsistencies detected",
-      severity: "High",
-      created_at: new Date().toISOString(),
-      document: {
-        document_type: "Income Statement",
-        application: {
-          client_name: "Emily Johnson"
+  const [alerts, setAlerts] = useState<FraudAlert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchFraudAlerts();
+    
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fraud_alerts'
+        },
+        () => {
+          fetchFraudAlerts();
         }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchFraudAlerts = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('fraud_alerts')
+        .select(`
+          *,
+          document:document_id (
+            document_type,
+            application_id,
+            application:application_id (
+              client_name
+            )
+          )
+        `)
+        .eq('resolved', false)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        throw error;
       }
-    },
-    {
-      id: "alert-002",
-      document_id: "doc-002",
-      issue: "Potential digital forgery",
-      severity: "Medium",
-      created_at: new Date().toISOString(),
-      document: {
-        document_type: "Property Deed",
-        application: {
-          client_name: "John Smith"
-        }
+      
+      if (data) {
+        setAlerts(data as FraudAlert[]);
       }
+    } catch (error) {
+      console.error("Error fetching fraud alerts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load fraud alerts",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ]);
-  
-  const [isLoading, setIsLoading] = useState(false);
+  };
 
   const getSeverityColor = (severity: string) => {
     switch (severity.toLowerCase()) {
@@ -61,6 +98,35 @@ const FraudAlertsList = () => {
         return 'bg-yellow-100 text-yellow-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const markAsResolved = async (alertId: string) => {
+    try {
+      const { error } = await supabase
+        .from('fraud_alerts')
+        .update({ resolved: true })
+        .eq('id', alertId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Alert marked as resolved",
+      });
+      
+      // Remove the alert from the local state
+      setAlerts(alerts.filter(alert => alert.id !== alertId));
+      
+    } catch (error) {
+      console.error("Error resolving alert:", error);
+      toast({
+        title: "Error",
+        description: "Failed to resolve alert",
+        variant: "destructive",
+      });
     }
   };
 
@@ -95,6 +161,14 @@ const FraudAlertsList = () => {
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Detected on {new Date(alert.created_at).toLocaleDateString()}
+                  </div>
+                  <div className="pt-2">
+                    <button 
+                      onClick={() => markAsResolved(alert.id)}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Mark as Resolved
+                    </button>
                   </div>
                 </div>
               </CardContent>

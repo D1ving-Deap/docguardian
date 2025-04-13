@@ -53,6 +53,41 @@ export type Database = {
           },
         ]
       }
+      fraud_alerts: {
+        Row: {
+          created_at: string
+          document_id: string | null
+          id: string
+          issue: string
+          resolved: boolean
+          severity: string
+        }
+        Insert: {
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          issue: string
+          resolved?: boolean
+          severity: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          issue?: string
+          resolved?: boolean
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_alerts_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "Gmail Waitlist": {
         Row: {
           created_at: string
@@ -72,6 +107,7 @@ export type Database = {
         Row: {
           client_name: string
           created_at: string
+          deleted_at: string | null
           email: string
           fraud_score: string | null
           id: string
@@ -83,6 +119,7 @@ export type Database = {
         Insert: {
           client_name: string
           created_at?: string
+          deleted_at?: string | null
           email: string
           fraud_score?: string | null
           id?: string
@@ -94,6 +131,7 @@ export type Database = {
         Update: {
           client_name?: string
           created_at?: string
+          deleted_at?: string | null
           email?: string
           fraud_score?: string | null
           id?: string
