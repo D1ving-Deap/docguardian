@@ -19,6 +19,7 @@ const handleOptionsRequest = () => {
 }
 
 // URL of your local OCR server - replace with your actual local server IP and port
+// You'll need to update this with your local machine's IP address
 const OCR_SERVER_URL = "http://YOUR_LOCAL_IP:3000/process-document"
 
 // Main serve function
