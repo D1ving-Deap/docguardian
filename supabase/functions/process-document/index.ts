@@ -18,6 +18,9 @@ const handleOptionsRequest = () => {
   })
 }
 
+// URL of your local OCR server - replace with your actual local server IP and port
+const OCR_SERVER_URL = "http://YOUR_LOCAL_IP:3000/process-document"
+
 // Main serve function
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -58,20 +61,31 @@ serve(async (req) => {
 
     console.log(`Processing document for application ${applicationId}, type: ${documentType}`)
 
-    // Generate a temporary document ID
-    const documentId = crypto.randomUUID()
+    // Create a new FormData to send to the OCR server
+    const ocrFormData = new FormData()
+    ocrFormData.append('file', file)
+    ocrFormData.append('applicationId', applicationId)
+    ocrFormData.append('documentType', documentType)
 
-    // Get file text (simplified mock extraction)
-    const fileText = `This is extracted text from ${file.name}`
+    // Forward the request to the local OCR server
+    console.log(`Forwarding request to OCR server: ${OCR_SERVER_URL}`)
+    const ocrResponse = await fetch(OCR_SERVER_URL, {
+      method: 'POST',
+      body: ocrFormData,
+    })
 
-    // Mock extracted fields for demo purposes
-    // In a real implementation, this would use a PDF parsing library
-    const mockExtractedFields = {
-      name: 'John Doe',
-      address: '123 Main St, Anytown, CA 12345',
-      income: '$85,000',
-      dateOfBirth: '1980-01-01'
+    if (!ocrResponse.ok) {
+      const errorText = await ocrResponse.text()
+      console.error('OCR server error:', errorText)
+      throw new Error(`OCR processing failed: ${errorText}`)
     }
+
+    // Parse the OCR server response
+    const ocrResult = await ocrResponse.json()
+    console.log('OCR processing completed successfully')
+
+    // Generate a document ID if not provided by OCR server
+    const documentId = ocrResult.documentId || crypto.randomUUID()
 
     // Store document information in the database
     const { data: docData, error: docError } = await supabase
@@ -82,8 +96,8 @@ serve(async (req) => {
         document_type: documentType,
         filename: file.name,
         file_path: filePath,
-        raw_text: fileText,
-        structured_data: mockExtractedFields
+        raw_text: ocrResult.rawText || '',
+        structured_data: ocrResult.extractedFields || {}
       })
       .select()
 
@@ -96,7 +110,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         documentId,
-        extractedFields: mockExtractedFields,
+        extractedFields: ocrResult.extractedFields,
         message: 'Document processed successfully'
       }),
       {

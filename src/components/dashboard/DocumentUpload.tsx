@@ -33,21 +33,22 @@ const DocumentUpload = ({
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      // Check file size (10MB max)
-      if (selectedFile.size > 10 * 1024 * 1024) {
+      // Check file size (20MB max for local OCR processing)
+      if (selectedFile.size > 20 * 1024 * 1024) {
         toast({
           title: "File too large",
-          description: "Maximum file size is 10MB",
+          description: "Maximum file size is 20MB",
           variant: "destructive"
         });
         return;
       }
       
-      // Validate file type
-      if (!selectedFile.type.includes('pdf')) {
+      // Validate file type (PDF or common image formats)
+      if (!selectedFile.type.includes('pdf') && 
+          !selectedFile.type.includes('image/')) {
         toast({
           title: "Invalid file type",
-          description: "Please upload a PDF file",
+          description: "Please upload a PDF file or image (JPG, PNG)",
           variant: "destructive"
         });
         return;
@@ -64,13 +65,14 @@ const DocumentUpload = ({
     
     try {
       // First, upload the file to Supabase Storage
-      // Generate a more sanitized key
-      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filePath = `${applicationId}/${documentType}`;
+      // Generate a sanitized file path with proper encoding
+      const timestamp = new Date().getTime();
+      const safeName = encodeURIComponent(file.name.replace(/[^a-zA-Z0-9.-]/g, '_'));
+      const filePath = `${applicationId}/${documentType}/${timestamp}_${safeName}`;
       const uploadResult = await storage.uploadFile(
         file,
         'applications',
-        filePath + '/' + safeName
+        filePath
       );
       
       if ('error' in uploadResult) {
@@ -84,9 +86,9 @@ const DocumentUpload = ({
       formData.append('documentType', documentType);
       formData.append('filePath', uploadResult.key);
       
-      console.log(`Uploaded to ${uploadResult.key}, calling edge function...`);
+      console.log(`Uploaded to ${uploadResult.key}, calling process-document function...`);
       
-      // Call our edge function to process the document
+      // Call our edge function to process the document with local OCR server
       const response = await fetch(`${supabaseUrl}/functions/v1/process-document`, {
         method: 'POST',
         body: formData
@@ -101,7 +103,7 @@ const DocumentUpload = ({
       
       toast({
         title: "Document Processed",
-        description: "File uploaded and processed successfully"
+        description: "File uploaded and processed successfully using local OCR"
       });
       
       setUploadedDocId(result.documentId);
@@ -141,7 +143,7 @@ const DocumentUpload = ({
         <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
           <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
           <p className="text-sm text-center text-muted-foreground mb-2">
-            Upload PDF document for automatic text extraction
+            Upload PDF or image for automatic text extraction via local OCR
           </p>
           <input
             type="file"
@@ -152,7 +154,7 @@ const DocumentUpload = ({
           />
           <label htmlFor={`file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`}>
             <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-              <span>Choose PDF File</span>
+              <span>Choose File</span>
             </Button>
           </label>
         </div>
@@ -183,12 +185,12 @@ const DocumentUpload = ({
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  Processing with local OCR...
                 </>
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Process Document
+                  Process with local OCR
                 </>
               )}
             </Button>
