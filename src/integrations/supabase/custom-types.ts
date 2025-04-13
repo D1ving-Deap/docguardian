@@ -19,6 +19,7 @@ export interface CustomDatabase extends OriginalDatabase {
           fraud_score: string | null;
           created_at: string;
           updated_at: string;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -30,6 +31,7 @@ export interface CustomDatabase extends OriginalDatabase {
           fraud_score?: string | null;
           created_at?: string;
           updated_at?: string;
+          deleted_at?: string | null;
         };
         Update: {
           id?: string;
@@ -41,6 +43,7 @@ export interface CustomDatabase extends OriginalDatabase {
           fraud_score?: string | null;
           created_at?: string;
           updated_at?: string;
+          deleted_at?: string | null;
         };
         Relationships: [];
       };
@@ -84,6 +87,41 @@ export interface CustomDatabase extends OriginalDatabase {
             columns: ["application_id"];
             isOneToOne: false;
             referencedRelation: "mortgage_applications";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      fraud_alerts: {
+        Row: {
+          id: string;
+          document_id: string | null;
+          issue: string;
+          severity: string;
+          created_at: string;
+          resolved: boolean;
+        };
+        Insert: {
+          id?: string;
+          document_id?: string | null;
+          issue: string;
+          severity: string;
+          created_at?: string;
+          resolved?: boolean;
+        };
+        Update: {
+          id?: string;
+          document_id?: string | null;
+          issue?: string;
+          severity?: string;
+          created_at?: string;
+          resolved?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fraud_alerts_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
             referencedColumns: ["id"];
           }
         ];

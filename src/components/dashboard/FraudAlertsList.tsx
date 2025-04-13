@@ -8,14 +8,14 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface FraudAlert {
   id: string;
-  document_id: string;
+  document_id: string | null;
   issue: string;
   severity: string;
   created_at: string;
   resolved: boolean;
   document?: {
     document_type: string;
-    application_id?: string;
+    application_id?: string | null;
     application?: {
       client_name: string;
     }
