@@ -3,8 +3,6 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 
-const __dirname = path.dirname(require.main.filename);
-
 console.log('📦 Starting Tesseract WASM asset verification...');
 console.log('📁 Current working directory:', process.cwd());
 
