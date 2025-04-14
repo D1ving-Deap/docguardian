@@ -57,10 +57,17 @@ async function downloadFile(url, dest) {
 }
  
  // Call the async function and handle errors
- verifyAssets().catch(error => {
-   console.error("Error during asset verification:", error);
-   process.exit(1); // Exit with an error code to signal failure
- });
+// Replace this
+verifyAssets().catch(error => {
+  console.error("Error during asset verification:", error);
+  process.exit(1); // Exit with an error code to signal failure
+});
+
+// With this
+main().catch(error => {
+  console.error("Error during asset verification:", error);
+  process.exit(1); // Exit with an error code to signal failure
+});
  // Main function to verify assets
  async function main() {
    try {
