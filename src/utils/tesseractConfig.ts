@@ -5,6 +5,7 @@ import { OCRClient } from 'tesseract-wasm';
 export const TESSERACT_CONFIG = {
   workerPath: '/public/tessdata/tesseract-worker.js',
   corePath: '/public/tessdata/tesseract-core.wasm',
+  corePath: '/public/tessdata/tesseract-core-fallback.wasm',
   trainingDataPath: '/public/tessdata/eng.traineddata',
 };
 
