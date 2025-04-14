@@ -3,10 +3,9 @@ import { OCRClient } from 'tesseract-wasm';
 
 // Configure paths to WASM files and training data
 export const TESSERACT_CONFIG = {
-  workerPath: '/tessdata/tesseract-worker.js',
-  corePath: '/tessdata/tesseract-core.wasm',
-  fallbackCorePath: '/tessdata/tesseract-core-fallback.wasm',
-  trainingDataPath: '/tessdata/eng.traineddata',
+  workerPath: "/tesseract-worker.js",
+  corePath: "/tesseract-core.wasm",
+  trainingDataPath: "/tessdata/eng.traineddata",
 };
 
 // Function to check if a file exists by loading it
