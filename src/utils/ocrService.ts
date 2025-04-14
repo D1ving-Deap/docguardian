@@ -16,15 +16,16 @@ export interface ExtractedFields {
 export const initializeOCRWorker = async (
   progressCallback?: (progress: number) => void
 ) => {
-  // Fix: Properly format createWorker() parameters
+  // Create worker with progress callback
   const worker = await createWorker({
-    logger: m => {
+    logger: (m) => {
       if (progressCallback && m.status === 'recognizing text') {
         progressCallback(m.progress);
       }
-    }
+    },
   });
   
+  // Initialize worker with English language
   await worker.loadLanguage('eng');
   await worker.initialize('eng');
   
