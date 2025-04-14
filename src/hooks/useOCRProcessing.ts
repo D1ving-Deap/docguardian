@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { performOCR, extractFieldsFromText, analyzeForIssues, ExtractedFields } from '@/utils/ocrService';
 import { supabase } from "@/integrations/supabase/client";
+import { verifyOCRAssets, getVerificationErrorMessage } from '@/utils/ocrVerification';
 
 interface OCRProcessingResult {
   documentId: string;
@@ -34,10 +35,20 @@ export const useOCRProcessing = ({
     
     try {
       setIsProcessing(true);
-      setProcessingStage('Initializing WASM OCR engine...');
+      setProcessingStage('Verifying OCR engine assets...');
       setProgress(5);
       
-      // Run OCR on the file with the new WASM-based engine
+      // Verify the OCR assets before processing
+      const verificationResult = await verifyOCRAssets();
+      if (!verificationResult.success) {
+        const errorMessage = getVerificationErrorMessage(verificationResult.missingFiles);
+        throw new Error(errorMessage);
+      }
+      
+      setProcessingStage('Initializing WASM OCR engine...');
+      setProgress(10);
+      
+      // Run OCR on the file with the WASM-based engine
       const ocrResult = await performOCR(file, (progress) => {
         setProgress(Math.floor(progress * 70) + 10); // Scale progress from 10-80%
         setProcessingStage(`Processing document: ${Math.floor(progress * 100)}%`);
@@ -121,7 +132,7 @@ export const useOCRProcessing = ({
       
       // Prepare final result
       const processingResult: OCRProcessingResult = {
-        documentId: applicationId ? crypto.randomUUID() : 'demo-' + Date.now(),
+        documentId: documentId,
         text: ocrResult.text,
         extractedFields,
         issues,

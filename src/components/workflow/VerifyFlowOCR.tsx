@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, FileText, Table } from "lucide-react";
 import { useOCRProcessing } from '@/hooks/useOCRProcessing';
 import { ExtractedFields } from '@/utils/ocrService';
 
@@ -12,6 +12,7 @@ import DocumentUploader from './ocr/DocumentUploader';
 import ProcessingStatus from './ocr/ProcessingStatus';
 import ExtractedFieldsDisplay from './ocr/ExtractedFieldsDisplay';
 import IssuesDisplay from './ocr/IssuesDisplay';
+import CategorizedDataTable from './ocr/CategorizedDataTable';
 
 interface VerifyFlowOCRProps {
   onProcessingComplete?: (result: {
@@ -31,11 +32,13 @@ const VerifyFlowOCR: React.FC<VerifyFlowOCRProps> = ({
 }) => {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
+  const [rawText, setRawText] = useState<string>('');
   const [ocrResult, setOcrResult] = useState<{
     documentId: string;
     extractedFields: ExtractedFields;
     issues?: { severity: string; message: string }[];
   } | null>(null);
+  const [showCategorizedData, setShowCategorizedData] = useState<boolean>(false);
 
   const {
     isProcessing,
@@ -47,6 +50,7 @@ const VerifyFlowOCR: React.FC<VerifyFlowOCRProps> = ({
     applicationId,
     documentType,
     onSuccess: (result) => {
+      setRawText(result.text);
       setOcrResult({
         documentId: result.documentId,
         extractedFields: result.extractedFields,
@@ -84,6 +88,8 @@ const VerifyFlowOCR: React.FC<VerifyFlowOCRProps> = ({
     if (!newFile) {
       resetOCR();
       setOcrResult(null);
+      setRawText('');
+      setShowCategorizedData(false);
     }
   };
 
@@ -99,6 +105,28 @@ const VerifyFlowOCR: React.FC<VerifyFlowOCRProps> = ({
   
   const reset = () => {
     handleFileChange(null);
+  };
+  
+  const toggleCategorizedView = () => {
+    setShowCategorizedData(!showCategorizedData);
+  };
+  
+  const downloadData = () => {
+    if (!ocrResult?.extractedFields) return;
+    
+    // Convert extracted fields to CSV or JSON
+    const jsonData = JSON.stringify(ocrResult.extractedFields, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `document-${ocrResult.documentId}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -136,7 +164,41 @@ const VerifyFlowOCR: React.FC<VerifyFlowOCRProps> = ({
                 
                 <IssuesDisplay issues={ocrResult.issues || []} />
                 
-                <ExtractedFieldsDisplay extractedFields={ocrResult.extractedFields} />
+                <div className="flex space-x-2 mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleCategorizedView}
+                    className="flex-1"
+                  >
+                    {showCategorizedData ? (
+                      <>
+                        <FileText className="h-4 w-4 mr-1" /> 
+                        Show Extracted Fields
+                      </>
+                    ) : (
+                      <>
+                        <Table className="h-4 w-4 mr-1" /> 
+                        Show Categorized Data
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadData}
+                    className="flex-1"
+                  >
+                    Download Data
+                  </Button>
+                </div>
+                
+                {showCategorizedData ? (
+                  <CategorizedDataTable extractedFields={ocrResult.extractedFields} documentType={documentType} />
+                ) : (
+                  <ExtractedFieldsDisplay extractedFields={ocrResult.extractedFields} />
+                )}
                 
                 <div className="flex space-x-2">
                   <Button
