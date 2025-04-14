@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
     
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -24,10 +25,30 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Verify WASM assets
-      run: node scripts/verify-wasm-assets.js
-      
-    - name: Check Tesseract configuration paths
+    - name: Verify Tesseract configuration
       run: |
-        echo "Checking configuration in src/utils/tesseractConfig.ts..."
+        echo "Checking tesseractConfig.ts file..."
         cat src/utils/tesseractConfig.ts
+      
+    - name: List public/tessdata directory
+      run: |
+        echo "Listing contents of public/tessdata directory..."
+        mkdir -p public/tessdata
+        ls -la public/tessdata || echo "Directory is empty or does not exist"
+      
+    - name: Verify WASM assets
+      run: |
+        echo "Running verification script..."
+        node scripts/verify-wasm-assets.js
+      
+    - name: Run copy-wasm-assets script
+      run: |
+        echo "Running copy-wasm-assets script to ensure files are present..."
+        node scripts/copy-wasm-assets.js
+        
+    - name: Verify files after copy
+      run: |
+        echo "Verifying files after copy operation..."
+        ls -la public/tessdata
+        echo "File sizes:"
+        du -h public/tessdata/*

@@ -5,36 +5,56 @@ import { OCRResult } from './types/ocrTypes';
 
 // Extract text from image or PDF using tesseract-wasm
 export const performOCR = async (
-  file: File,
+  file: File | Blob | ImageBitmap,
   progressCallback?: (progress: number) => void
 ): Promise<OCRResult> => {
   try {
+    console.log('Starting OCR processing for file:', file instanceof File ? file.name : 'blob or image');
+    
     // Initialize OCR client with progress callback
     const ocrClient = await createOCRClient({
-      logger: progressCallback ? (message: any) => {
-        if (message.status === 'recognizing text') {
-          progressCallback(message.progress || 0);
-        }
-      } : undefined
+      progressCallback,
+      logger: (message) => {
+        console.log('Tesseract progress:', message);
+      }
     });
     
-    // Convert file to ImageBitmap for processing
-    const imageBitmap = await createImageBitmap(file);
-    await ocrClient.loadImage(imageBitmap);
+    // Handle different input types
+    let imageBitmap: ImageBitmap;
     
-    // Perform text recognition
+    if (file instanceof ImageBitmap) {
+      console.log('Using provided ImageBitmap');
+      imageBitmap = file;
+    } else {
+      console.log('Converting file/blob to ImageBitmap');
+      imageBitmap = await createImageBitmap(file);
+      console.log('Successfully converted to ImageBitmap');
+    }
+    
+    // Load image into OCR client
+    console.log('Loading image into OCR client');
+    await ocrClient.loadImage(imageBitmap);
+    console.log('Image loaded successfully');
+    
+    // Get the recognized text
+    console.log('Extracting text from image');
     const text = await ocrClient.getText();
+    console.log('Text extraction completed');
+    
+    // Calculate confidence (approximate since tesseract-wasm doesn't provide direct confidence)
+    const confidence = 85; // Using a default confidence value
     
     // Clean up resources
+    console.log('Cleaning up OCR resources');
     ocrClient.destroy();
     
     return {
       text,
-      confidence: 90, // tesseract-wasm doesn't provide confidence metrics directly
+      confidence,
       progress: 100
     };
   } catch (error) {
     console.error('OCR processing error:', error);
-    throw new Error('Failed to process document with OCR');
+    throw new Error(`Failed to process document with OCR: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
