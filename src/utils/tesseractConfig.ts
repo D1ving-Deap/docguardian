@@ -3,15 +3,16 @@ import { OCRClient } from 'tesseract-wasm';
 
 // Configure paths to WASM files and training data
 export const TESSERACT_CONFIG = {
-  workerPath: '/tessdata/tesseract-worker.js',
-  corePath: '/tessdata/tesseract-core.wasm',
-  trainingDataPath: '/tessdata/eng.traineddata'
+  workerPath: '/public/tessdata/tesseract-worker.js',
+  corePath: '/public/tessdata/tesseract-core.wasm',
+  trainingDataPath: '/public/tessdata/eng.traineddata',
 };
 
 // Function to check if a file exists by loading it
 export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
     const response = await fetch(url, { method: 'HEAD' });
+    console.log('Checking URL:', url, 'Response Status:', response.status);
     return response.ok;
   } catch (error) {
     console.error(`Failed to check if file exists at ${url}:`, error);
@@ -91,7 +92,7 @@ export const createOCRClient = async (
     const client = await Promise.race([
       new OCRClient(config),
       new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('OCR client initialization timed out after 10 seconds')), 10000)
+        setTimeout(() => reject(new Error('OCR client initialization timed out after 20 seconds')), 20000)
       )
     ]) as OCRClient;
     
