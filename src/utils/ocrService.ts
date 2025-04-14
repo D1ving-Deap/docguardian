@@ -5,7 +5,7 @@ import { extractFieldsFromText } from './fieldExtraction';
 import { analyzeForIssues } from './issueAnalysis';
 
 // Import from types file
-import { 
+import type { 
   OCRResult, 
   ExtractedFields, 
   DocumentIssue, 
