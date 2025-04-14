@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, X, Loader2, Upload, CheckCircle2 } from "lucide-react";
 import { supabase, supabaseUrl } from "@/integrations/supabase/client";
 import storage from '@/utils/supabaseStorage';
-import { createWorker } from 'tesseract.js';
+import { performOCR, extractFieldsFromText } from '@/utils/ocrService';
 
 interface DocumentUploadProps {
   label: string;
@@ -61,24 +62,28 @@ const DocumentUpload = ({
     setProcessingStatus('Initializing OCR engine...');
     
     try {
-      const worker = await createWorker('eng');
+      // Convert URL to File object for processing
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const file = new File([blob], 'document.png', { type: blob.type });
       
       setProcessingStatus('Reading document text...');
       
-      const result = await worker.recognize(imageUrl);
+      // Use the WASM-based OCR engine
+      const result = await performOCR(file, (progress) => {
+        setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
+      });
       
       setProcessingStatus('Extracting data from text...');
       
-      const extractedFields = extractFieldsFromText(result.data.text, documentType);
-      
-      await worker.terminate();
+      const extractedFields = extractFieldsFromText(result.text, documentType);
       
       return { 
-        text: result.data.text,
+        text: result.text,
         extractedFields
       };
     } catch (error) {
-      console.error('Tesseract OCR error:', error);
+      console.error('OCR error:', error);
       throw new Error('Failed to extract text from document');
     }
   };

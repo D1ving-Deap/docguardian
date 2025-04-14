@@ -34,10 +34,10 @@ export const useOCRProcessing = ({
     
     try {
       setIsProcessing(true);
-      setProcessingStage('Initializing OCR engine...');
+      setProcessingStage('Initializing WASM OCR engine...');
       setProgress(5);
       
-      // Run OCR on the file
+      // Run OCR on the file with the new WASM-based engine
       const ocrResult = await performOCR(file, (progress) => {
         setProgress(Math.floor(progress * 70) + 10); // Scale progress from 10-80%
         setProcessingStage(`Processing document: ${Math.floor(progress * 100)}%`);
@@ -121,7 +121,7 @@ export const useOCRProcessing = ({
       
       // Prepare final result
       const processingResult: OCRProcessingResult = {
-        documentId,
+        documentId: applicationId ? crypto.randomUUID() : 'demo-' + Date.now(),
         text: ocrResult.text,
         extractedFields,
         issues,

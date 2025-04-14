@@ -1,6 +1,5 @@
 
-import { createWorker } from 'tesseract.js';
-import type { Worker, WorkerOptions } from 'tesseract.js';
+import { OCRClient } from 'tesseract-wasm';
 
 export interface OCRResult {
   text: string;
@@ -13,41 +12,53 @@ export interface ExtractedFields {
   metadata: string;
 }
 
-// Initialize OCR worker with specific configuration
-export const initializeOCRWorker = async (
+// Initialize OCR client with WASM engine
+export const initializeOCRClient = async (
   progressCallback?: (progress: number) => void
-): Promise<Worker> => {
-  // Create worker with progress callback
-  const worker = await createWorker({
-    logger: m => {
-      if (progressCallback && m.status === 'recognizing text') {
-        progressCallback(m.progress);
-      }
-    }
-  });
-  
-  // Load language - in v5 we can set the language during initialization
-  await worker.loadLanguage('eng');
-  await worker.initialize('eng');
-  
-  return worker;
+): Promise<OCRClient> => {
+  try {
+    const ocrClient = new OCRClient({
+      // Optional configuration for the OCR client
+      workerPath: '/tesseract-worker.js',
+      corePath: '/tesseract-core.wasm',
+      logger: progressCallback ? (message: any) => {
+        if (message.status === 'recognizing text') {
+          progressCallback(message.progress || 0);
+        }
+      } : undefined
+    });
+    
+    // Load the English language model
+    await ocrClient.loadModel('/tessdata/eng.traineddata');
+    
+    return ocrClient;
+  } catch (error) {
+    console.error('Failed to initialize OCR client:', error);
+    throw new Error('Failed to initialize OCR engine');
+  }
 };
 
-// Extract text from image or PDF using Tesseract
+// Extract text from image or PDF using tesseract-wasm
 export const performOCR = async (
   file: File,
   progressCallback?: (progress: number) => void
 ): Promise<OCRResult> => {
   try {
-    const worker = await initializeOCRWorker(progressCallback);
+    const ocrClient = await initializeOCRClient(progressCallback);
     
-    const result = await worker.recognize(file);
+    // Convert file to ImageBitmap for processing
+    const imageBitmap = await createImageBitmap(file);
+    await ocrClient.loadImage(imageBitmap);
     
-    await worker.terminate();
+    // Perform text recognition
+    const text = await ocrClient.getText();
+    
+    // Clean up resources
+    ocrClient.destroy();
     
     return {
-      text: result.data.text,
-      confidence: result.data.confidence,
+      text,
+      confidence: 90, // tesseract-wasm doesn't provide confidence metrics directly
       progress: 100
     };
   } catch (error) {
