@@ -40,30 +40,21 @@ const fs = require('fs');
  ];
  
  // Function to download files
- async function downloadFile(url, dest) {
-   const protocol = url.startsWith('https') ? https : http;
-   return new Promise((resolve, reject) => {
-     const file = fs.createWriteStream(dest);
-     protocol.get(url, (response) => {
-       if (response.statusCode !== 200) {
-         return reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
-       }
-       response.pipe(file);
-       file.on('finish', () => file.close(resolve));
-     }).on('error', (err) => {
-       fs.unlink(dest, () => reject(err));
-     });
-   });
- // Define an async function to handle the download logic
- async function verifyAssets() {
-   for (const file of requiredFiles) {
-     const filePath = path.join(publicTessDataDir, file.path);
-     if (!fs.existsSync(filePath)) {
-       console.log(`Downloading missing file: ${file.name}`);
-       await downloadFile(file.url, filePath); // Now properly wrapped in an async function
-     }
-   }
- }
+async function downloadFile(url, dest) {
+  const protocol = url.startsWith('https') ? https : http;
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(dest);
+    protocol.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        return reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
+      }
+      response.pipe(file);
+      file.on('finish', () => file.close(resolve));
+    }).on('error', (err) => {
+      fs.unlink(dest, () => reject(err));
+    });
+  });
+}
  
  // Call the async function and handle errors
  verifyAssets().catch(error => {
