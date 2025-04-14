@@ -1,14 +1,34 @@
 
-import { performOCR, OCRResult } from './tesseractOCR';
-import { extractFieldsFromText, ExtractedFields } from './fieldExtraction';
+// Import from implementation files
+import { performOCR } from './tesseractOCR';
+import { extractFieldsFromText } from './fieldExtraction';
 import { analyzeForIssues } from './issueAnalysis';
 
-// Use export type for type re-exports
-export type { OCRResult, ExtractedFields };
+// Import from types file
+import { 
+  OCRResult, 
+  ExtractedFields, 
+  DocumentIssue, 
+  ProcessedDocument, 
+  DocumentType,
+  OCRMetadata,
+  IssueSeverity
+} from './types/ocrTypes';
 
-// Re-export functions as before
-export { 
-  performOCR, 
-  extractFieldsFromText, 
-  analyzeForIssues 
+// Re-export types
+export type {
+  OCRResult,
+  ExtractedFields,
+  DocumentIssue,
+  ProcessedDocument,
+  DocumentType,
+  OCRMetadata,
+  IssueSeverity
+};
+
+// Re-export implementation functions
+export {
+  performOCR,
+  extractFieldsFromText,
+  analyzeForIssues
 };

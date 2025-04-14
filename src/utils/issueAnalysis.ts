@@ -1,9 +1,9 @@
 
-import { ExtractedFields } from './fieldExtraction';
+import { DocumentIssue, ExtractedFields, IssueSeverity } from './types/ocrTypes';
 
 // Analyzes extracted fields to detect potential issues
-export const analyzeForIssues = (extractedFields: ExtractedFields, docType: string): Array<{ severity: string; message: string }> => {
-  const issues: Array<{ severity: string; message: string }> = [];
+export const analyzeForIssues = (extractedFields: ExtractedFields, docType: string): DocumentIssue[] => {
+  const issues: DocumentIssue[] = [];
   
   // Parse the metadata
   try {

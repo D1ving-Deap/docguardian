@@ -1,8 +1,4 @@
-
-export interface ExtractedFields {
-  [key: string]: string | number;
-  metadata: string;
-}
+import { DocumentType, ExtractedFields } from './types/ocrTypes';
 
 // Extract structured fields from OCR text based on document type
 export const extractFieldsFromText = (text: string, docType: string): ExtractedFields => {

@@ -1,12 +1,7 @@
 
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
-
-export interface OCRResult {
-  text: string;
-  confidence: number;
-  progress: number;
-}
+import { OCRResult } from './types/ocrTypes';
 
 // Extract text from image or PDF using tesseract-wasm
 export const performOCR = async (
