@@ -3,10 +3,10 @@ import { OCRClient } from 'tesseract-wasm';
 
 // Configure paths to WASM files and training data
 export const TESSERACT_CONFIG = {
-  workerPath: '/public/tessdata/tesseract-worker.js',
-  corePath: '/public/tessdata/tesseract-core.wasm',
-  corePath: '/public/tessdata/tesseract-core-fallback.wasm',
-  trainingDataPath: '/public/tessdata/eng.traineddata',
+  workerPath: '/tessdata/tesseract-worker.js',
+  corePath: '/tessdata/tesseract-core.wasm',
+  fallbackCorePath: '/tessdata/tesseract-core-fallback.wasm',
+  trainingDataPath: '/tessdata/eng.traineddata',
 };
 
 // Function to check if a file exists by loading it
@@ -91,7 +91,10 @@ export const createOCRClient = async (
     
     // Wrap OCR client creation in a timeout to catch initialization issues
     const client = await Promise.race([
-      new OCRClient(config),
+      new Promise<OCRClient>((resolve) => {
+        const newClient = new OCRClient(config);
+        resolve(newClient);
+      }),
       new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('OCR client initialization timed out after 20 seconds')), 20000)
       )

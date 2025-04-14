@@ -8,7 +8,7 @@ console.log('Starting Tesseract WASM asset verification...');
 console.log('Current working directory:', process.cwd());
 
 // Define the directory for Tesseract assets
-const publicTessDataDir = path.resolve(__dirname, '../public/tessdata');
+const publicTessDataDir = path.resolve(process.cwd(), './public/tessdata');
 console.log('Checking WASM assets in:', publicTessDataDir);
 
 // Define expected configuration paths
@@ -24,35 +24,6 @@ const requiredFiles = [
   { name: 'tesseract-worker.js', path: 'tesseract-worker.js', minSize: 10 * 1024 }, // At least 10KB
   { name: 'eng.traineddata', path: 'eng.traineddata', minSize: 10 * 1024 * 1024 } // At least 10MB
 ];
-
-// Function to download a file if it's missing
-const downloadFile = (url, destination) => {
-  console.log(`Attempting to download ${url} to ${destination}...`);
-  
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(destination);
-    const protocol = url.startsWith('https') ? https : http;
-    
-    protocol.get(url, (response) => {
-      if (response.statusCode === 200) {
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          console.log(`Successfully downloaded ${url}`);
-          resolve();
-        });
-      } else {
-        fs.unlink(destination, () => {}); // Delete the file if download failed
-        console.error(`Failed to download ${url}: ${response.statusCode} ${response.statusMessage}`);
-        reject(new Error(`Failed to download file: ${response.statusCode} ${response.statusMessage}`));
-      }
-    }).on('error', (err) => {
-      fs.unlink(destination, () => {}); // Delete the file if download failed
-      console.error(`Error downloading ${url}:`, err.message);
-      reject(err);
-    });
-  });
-};
 
 // Check if directory exists
 if (!fs.existsSync(publicTessDataDir)) {
@@ -114,7 +85,7 @@ if (allFilesExist) {
   if (fs.existsSync(wasmPath)) {
     try {
       const wasmBuffer = fs.readFileSync(wasmPath);
-      // Check for WASM magic bytes: 0x00 0x61 0x73 0x6D (byte value for \\0ASM)
+      // Check for WASM magic bytes: 0x00 0x61 0x73 0x6D (byte value for \0ASM)
       if (wasmBuffer.length >= 4 && 
           wasmBuffer[0] === 0x00 && 
           wasmBuffer[1] === 0x61 && 
@@ -152,7 +123,7 @@ try {
   Object.entries(expectedPaths).forEach(([key, configPath]) => {
     // Remove leading slash and construct the full path
     const relativePath = configPath.startsWith('/') ? configPath.substring(1) : configPath;
-    const fullPath = path.resolve(__dirname, '../public', relativePath);
+    const fullPath = path.resolve(process.cwd(), './public', relativePath);
     
     if (fs.existsSync(fullPath)) {
       const stats = fs.statSync(fullPath);
@@ -171,12 +142,14 @@ if (!allFilesExist || !allFilesValid) {
   console.log('\n⚠️ Some required files are missing or invalid!');
   console.log('\nTROUBLESHOOTING STEPS:');
   console.log('1. Make sure tesseract-wasm is installed: npm install tesseract-wasm');
-  console.log('2. Run copy script: node scripts/copy-wasm-assets.js');
+  console.log('2. Copy required assets to public/tessdata/ directory');
   console.log('3. Check paths in tesseractConfig.ts match the actual file locations');
   console.log('4. If files still missing, manually download and place in public/tessdata/');
-  console.log('\nSuggested manual download sources:');
-  console.log('- Worker and WASM: https://github.com/zliide/tesseract-wasm/tree/master/dist');
-  console.log('- Training data: https://github.com/tesseract-ocr/tessdata/blob/main/eng.traineddata');
+  
+  console.log('\nWeb browser tips:');
+  console.log('1. Check browser console for network errors when loading files');
+  console.log('2. Ensure browser supports WebAssembly');
+  console.log('3. Clear browser cache and try again');
 } else {
   console.log('\n✅ All required Tesseract WASM files are present and appear valid!');
   console.log('Your OCR system should be ready to use.');
@@ -188,9 +161,8 @@ console.log('1. Verify browser compatibility (WASM support)');
 console.log('2. Check for CORS issues if files are served from different origin');
 console.log('3. Test with a known good image file to confirm OCR functionality');
 console.log('4. Review browser console for detailed error messages during OCR operations');
-console.log('5. For more languages, add additional traineddata files to /public/tessdata/');
 
-// Export status for GitHub Actions
+// Exit with appropriate code for CI/CD
 if (!allFilesExist || !allFilesValid) {
   process.exit(1); // Exit with error
 } else {

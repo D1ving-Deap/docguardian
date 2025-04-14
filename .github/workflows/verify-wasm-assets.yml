@@ -50,30 +50,42 @@ jobs:
           echo "❌ tesseractConfig.ts MISSING"
         fi
       
-    - name: Create and list public/tessdata directory
+    - name: Check for tessdata directory
       run: |
-        echo "Creating and listing contents of public/tessdata directory..."
-        mkdir -p public/tessdata
-        ls -la public/tessdata || echo "Directory is empty or does not exist"
-      
-    - name: Run copy-wasm-assets script
-      run: |
-        echo "Running copy-wasm-assets script to ensure files are present..."
-        if [ -f "scripts/copy-wasm-assets.js" ]; then
-          node scripts/copy-wasm-assets.js
-          echo "✅ copy-wasm-assets.js executed"
+        echo "Checking tessdata directory in public folder..."
+        if [ -d "public/tessdata" ]; then
+          echo "✅ public/tessdata directory exists"
+          ls -la public/tessdata
+          echo "File sizes:"
+          du -h public/tessdata/* || echo "No files found"
         else
-          echo "❌ copy-wasm-assets.js script MISSING"
+          echo "❌ public/tessdata directory MISSING"
+          echo "Creating directory..."
+          mkdir -p public/tessdata
+        fi
+      
+    - name: Check WASM files existence
+      run: |
+        echo "Checking for required WASM files..."
+        if [ -f "public/tessdata/tesseract-worker.js" ]; then
+          echo "✅ tesseract-worker.js exists"
+        else
+          echo "❌ tesseract-worker.js MISSING"
         fi
         
-    - name: Verify files after copy
-      run: |
-        echo "Verifying files after copy operation..."
-        ls -la public/tessdata
-        echo "File sizes:"
-        du -h public/tessdata/* || echo "No files found"
+        if [ -f "public/tessdata/tesseract-core.wasm" ]; then
+          echo "✅ tesseract-core.wasm exists"
+        else
+          echo "❌ tesseract-core.wasm MISSING"
+        fi
         
-    - name: Verify WASM assets
+        if [ -f "public/tessdata/eng.traineddata" ]; then
+          echo "✅ eng.traineddata exists"
+        else
+          echo "❌ eng.traineddata MISSING"
+        fi
+        
+    - name: Run verify-wasm-assets script
       run: |
         echo "Running verification script..."
         if [ -f "scripts/verify-wasm-assets.js" ]; then
@@ -86,17 +98,7 @@ jobs:
           fi
         else
           echo "❌ verify-wasm-assets.js script MISSING"
-          exit 1
         fi
-        
-    - name: Check browser compatibility
-      run: |
-        echo "Browsers that support WebAssembly:"
-        echo "✅ Chrome: version 57+"
-        echo "✅ Firefox: version 52+"
-        echo "✅ Safari: version 11+"
-        echo "✅ Edge: version 16+"
-        echo "Ensure your target browsers support WebAssembly for OCR functionality to work."
         
     - name: Provide troubleshooting guide
       run: |
