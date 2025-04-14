@@ -41,21 +41,38 @@ const requiredFiles = [
 ];
 
 // Download missing files
+// Download missing files
 async function verifyAssets() {
   for (const file of requiredFiles) {
     const filePath = path.join(publicTessDataDir, file.path);
     if (!fs.existsSync(filePath)) {
       console.log(`Downloading missing file: ${file.name}`);
-      await downloadFile(file.url, filePath);
+      await downloadFile(file.url, filePath); // Ensure this function is defined elsewhere
     }
   }
 }
 
 // Call the async function and handle errors
-verifyAssets().catch(error => {
-  console.error("Error during asset verification:", error);
-  process.exit(1);
-});
+verifyAssets()
+  .then(() => {
+    console.log("✅ Asset verification completed successfully.");
+  })
+  .catch((error) => {
+    console.error("Error during asset verification:", error);
+    process.exit(1); // Exit with an error code
+  });
+
+// Check if directory exists
+if (!fs.existsSync(publicTessDataDir)) {
+  console.error(`❌ Directory not found: ${publicTessDataDir}`);
+  console.log("Creating directory...");
+  try {
+    fs.mkdirSync(publicTessDataDir, { recursive: true });
+    console.log(`✅ Created directory: ${publicTessDataDir}`);
+  } catch (error) {
+    console.error(`Failed to create directory: ${error.message}`);
+  }
+}
 
 // Check if directory exists
 if (!fs.existsSync(publicTessDataDir)) {
