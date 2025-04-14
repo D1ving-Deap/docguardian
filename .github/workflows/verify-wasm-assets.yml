@@ -1,0 +1,33 @@
+
+name: Verify WASM Assets
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Verify WASM assets
+      run: node scripts/verify-wasm-assets.js
+      
+    - name: Check Tesseract configuration paths
+      run: |
+        echo "Checking configuration in src/utils/tesseractConfig.ts..."
+        cat src/utils/tesseractConfig.ts
