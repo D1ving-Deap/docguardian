@@ -88,8 +88,8 @@ jobs:
     - name: Run verify-wasm-assets script
       run: |
         echo "Running verification script..."
-        if [ -f "scripts/verify-wasm-assets.js" ]; then
-          node scripts/verify-wasm-assets.js
+        if [ -f "scripts/verify-wasm-assets.cjs" ]; then
+          node scripts/verify-wasm-assets.cjs
           VERIFY_EXIT_CODE=$?
           if [ $VERIFY_EXIT_CODE -eq 0 ]; then
             echo "✅ Verification succeeded!"
@@ -97,7 +97,7 @@ jobs:
             echo "❌ Verification failed with exit code: $VERIFY_EXIT_CODE"
           fi
         else
-          echo "❌ verify-wasm-assets.js script MISSING"
+          echo "❌ verify-wasm-assets.cjs script MISSING"
         fi
         
     - name: Provide troubleshooting guide
