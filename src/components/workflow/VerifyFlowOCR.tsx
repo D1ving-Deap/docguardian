@@ -158,7 +158,7 @@ const VerifyFlowOCR: React.FC<VerifyFlowOCRProps> = ({
             description: mockIssues 
               ? "Document processed with potential issues detected" 
               : "Document processed successfully",
-            variant: mockIssues ? "warning" : "default"
+            variant: mockIssues ? "destructive" : "default"
           });
           
           setIsProcessing(false);

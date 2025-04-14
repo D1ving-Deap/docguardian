@@ -16,7 +16,7 @@ export interface ExtractedFields {
 export const initializeOCRWorker = async (
   progressCallback?: (progress: number) => void
 ) => {
-  const worker = await createWorker('eng', {
+  const worker = await createWorker('eng', 1, {
     logger: m => {
       if (progressCallback && m.status === 'recognizing text') {
         progressCallback(m.progress);
