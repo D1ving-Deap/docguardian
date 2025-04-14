@@ -41,13 +41,21 @@ const requiredFiles = [
 ];
 
 // Download missing files
-for (const file of requiredFiles) {
-  const filePath = path.join(publicTessDataDir, file.path);
-  if (!fs.existsSync(filePath)) {
-    console.log(`Downloading missing file: ${file.name}`);
-    await downloadFile(file.url, filePath);
+async function verifyAssets() {
+  for (const file of requiredFiles) {
+    const filePath = path.join(publicTessDataDir, file.path);
+    if (!fs.existsSync(filePath)) {
+      console.log(`Downloading missing file: ${file.name}`);
+      await downloadFile(file.url, filePath);
+    }
   }
 }
+
+// Call the async function and handle errors
+verifyAssets().catch(error => {
+  console.error("Error during asset verification:", error);
+  process.exit(1);
+});
 
 // Check if directory exists
 if (!fs.existsSync(publicTessDataDir)) {
