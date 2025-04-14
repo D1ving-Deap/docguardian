@@ -41,21 +41,22 @@ const requiredFiles = [
 ];
 
 // Download missing files
-async function verifyFiles() {
-  for (const file of requiredFiles) {
-    const filePath = path.join(publicTessDataDir, file.path);
-    if (!fs.existsSync(filePath)) {
-      console.log(`Downloading missing file: ${file.name}`);
-      await downloadFile(file.url, filePath);
-    }
-  }
-}
-
-// Call the async function
-verifyFiles().catch(error => {
-  console.error('Error verifying files:', error.message);
-});
-
+// Define an async function to handle the download logic
+ async function verifyAssets() {
+   for (const file of requiredFiles) {
+     const filePath = path.join(publicTessDataDir, file.path);
+     if (!fs.existsSync(filePath)) {
+       console.log(`Downloading missing file: ${file.name}`);
+       await downloadFile(file.url, filePath); // Now properly wrapped in an async function
+     }
+   }
+ }
+ 
+ // Call the async function and handle errors
+ verifyAssets().catch(error => {
+   console.error("Error during asset verification:", error);
+   process.exit(1); // Exit with an error code to signal failure
+ });
 // Check if directory exists
 if (!fs.existsSync(publicTessDataDir)) {
   console.error(`❌ Directory not found: ${publicTessDataDir}`);
