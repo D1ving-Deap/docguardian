@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +6,6 @@ import { supabase, supabaseUrl } from "@/integrations/supabase/client";
 import storage from '@/utils/supabaseStorage';
 import { createWorker } from 'tesseract.js';
 
-// DocumentUpload Component Props
 interface DocumentUploadProps {
   label: string;
   description?: string;
@@ -36,7 +34,6 @@ const DocumentUpload = ({
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      // Check file size (50MB max)
       if (selectedFile.size > 50 * 1024 * 1024) {
         toast({
           title: "File too large",
@@ -46,7 +43,6 @@ const DocumentUpload = ({
         return;
       }
       
-      // Validate file type
       if (!selectedFile.type.includes('pdf') && 
           !selectedFile.type.includes('image/')) {
         toast({
@@ -61,26 +57,20 @@ const DocumentUpload = ({
     }
   };
   
-  // Function to extract text using Tesseract WASM
   const extractTextWithTesseract = async (imageUrl: string): Promise<{ text: string, extractedFields?: any }> => {
     setProcessingStatus('Initializing OCR engine...');
     
     try {
-      // Initialize Tesseract worker with English language
       const worker = await createWorker('eng');
       
       setProcessingStatus('Reading document text...');
       
-      // Recognize text from image
       const result = await worker.recognize(imageUrl);
       
       setProcessingStatus('Extracting data from text...');
       
-      // Basic field extraction based on document type
-      // This is a simple implementation - in production you'd want more sophisticated extraction
       const extractedFields = extractFieldsFromText(result.data.text, documentType);
       
-      // Terminate worker to free resources
       await worker.terminate();
       
       return { 
@@ -93,14 +83,11 @@ const DocumentUpload = ({
     }
   };
   
-  // Simple field extraction from text (can be enhanced with better algorithms)
   const extractFieldsFromText = (text: string, docType: string): any => {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const extractedFields: Record<string, string> = {};
+    const extractedFields: Record<string, string | { processed: string; confidence: number; edited: boolean }> = {};
     
-    // Different extraction logic based on document type
     if (docType.toLowerCase().includes('income') || docType.toLowerCase().includes('pay')) {
-      // Extract income information
       const incomeRegex = /\$?(\d{1,3}(,\d{3})*(\.\d{2})?)/g;
       const incomeMatches = text.match(incomeRegex);
       
@@ -108,7 +95,6 @@ const DocumentUpload = ({
         extractedFields.income = incomeMatches[0];
       }
       
-      // Extract dates
       const dateRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
       const dateMatches = text.match(dateRegex);
       
@@ -117,7 +103,6 @@ const DocumentUpload = ({
       }
     } 
     else if (docType.toLowerCase().includes('id') || docType.toLowerCase().includes('license')) {
-      // Extract name (simple implementation)
       for (const line of lines) {
         if (line.toLowerCase().includes('name:')) {
           extractedFields.name = line.split(':')[1]?.trim() || '';
@@ -125,7 +110,6 @@ const DocumentUpload = ({
         }
       }
       
-      // Extract DOB
       const dobRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
       const dobMatches = text.match(dobRegex);
       
@@ -133,7 +117,6 @@ const DocumentUpload = ({
         extractedFields.dateOfBirth = dobMatches[0];
       }
       
-      // Extract ID number (simple implementation)
       const idRegex = /\b[A-Z0-9]{6,15}\b/g;
       const idMatches = text.match(idRegex);
       
@@ -142,12 +125,11 @@ const DocumentUpload = ({
       }
     }
     
-    // Add metadata for fraud detection demo
-    extractedFields.metadata = {
+    extractedFields.metadata = JSON.stringify({
       processed: new Date().toISOString(),
-      confidence: Math.random() * 100, // Demo value
-      edited: Math.random() < 0.2 // Random flag for demo
-    };
+      confidence: Math.random() * 100,
+      edited: Math.random() < 0.2
+    });
     
     return extractedFields;
   };
@@ -159,7 +141,6 @@ const DocumentUpload = ({
     setProcessingStatus('Uploading document...');
     
     try {
-      // First, upload the file to Supabase Storage
       const timestamp = new Date().getTime();
       const safeName = encodeURIComponent(file.name.replace(/[^a-zA-Z0-9.-]/g, '_'));
       const filePath = `${applicationId}/${documentType}/${timestamp}_${safeName}`;
@@ -175,22 +156,18 @@ const DocumentUpload = ({
       
       setProcessingStatus('Processing document with browser-based OCR...');
       
-      // For images, we can extract text directly with Tesseract
       let ocrResult: { text: string, extractedFields?: any } = { text: '' };
       
-      // Create object URL for the file so Tesseract can process it
       const objectUrl = URL.createObjectURL(file);
       
       try {
         ocrResult = await extractTextWithTesseract(objectUrl);
       } finally {
-        // Clean up object URL
         URL.revokeObjectURL(objectUrl);
       }
       
       setProcessingStatus('Saving document information...');
       
-      // Create a new document record in the database
       const documentId = crypto.randomUUID();
       const { data: docData, error: docError } = await supabase
         .from('documents')
@@ -210,11 +187,8 @@ const DocumentUpload = ({
         throw new Error(`Database error: ${docError.message}`);
       }
       
-      // Check for potential fraud based on document type
       setProcessingStatus('Running fraud checks...');
       
-      // Call our edge function to validate the document and check for fraud
-      // This still uses our edge function for server-side fraud detection
       const response = await fetch(`${supabaseUrl}/functions/v1/process-document`, {
         method: 'POST',
         headers: {
@@ -348,7 +322,6 @@ const DocumentUpload = ({
                   <h4 className="text-sm font-medium mb-2">Extracted Information</h4>
                   <div className="space-y-1 text-sm">
                     {Object.entries(extractedData).map(([key, value]) => {
-                      // Skip metadata object from display
                       if (key === "metadata" && typeof value === "object") return null;
                       
                       return (
