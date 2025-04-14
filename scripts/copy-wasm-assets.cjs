@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-const https = require('https');
+import https from 'https';
 
 console.log('Starting Tesseract WASM assets copy process...');
 console.log('Current working directory:', process.cwd());
