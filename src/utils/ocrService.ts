@@ -1,5 +1,6 @@
+
 import { createWorker } from 'tesseract.js';
-import type { Worker, WorkerOptions } from 'tesseract.js';
+import type { Worker } from 'tesseract.js';
 
 export interface OCRResult {
   text: string;
@@ -23,7 +24,7 @@ export const initializeOCRWorker = async (
         progressCallback(m.progress);
       }
     }
-  } as WorkerOptions);
+  });
   
   // Initialize worker with English language
   await worker.loadLanguage('eng');
