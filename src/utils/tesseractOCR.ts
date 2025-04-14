@@ -2,6 +2,7 @@
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient, verifyOCRFiles } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
+import { diagnoseOCRIssues } from './ocrVerification';
 
 // Diagnostic function to check file type and provide helpful info
 const validateFile = (file: File | Blob | ImageBitmap): { valid: boolean; details: string } => {
@@ -47,16 +48,17 @@ export const performOCR = async (
       throw new Error(validation.details);
     }
     
-    // Verify OCR files are available
+    // Verify OCR files are available with enhanced error handling
     console.log('Verifying OCR files are available...');
     const filesVerification = await verifyOCRFiles();
     if (!filesVerification.success) {
-      throw new Error(filesVerification.message);
+      console.error('OCR file verification failed. Attempting to proceed with available files...');
+      // We will still try to proceed with the paths that were found
     }
     
     console.log('Starting OCR processing for file:', file instanceof File ? file.name : 'blob or image');
     
-    // Initialize OCR client with progress callback
+    // Initialize OCR client with progress callback and detected working paths
     ocrClient = await createOCRClient({
       progressCallback,
       logger: (message) => {
@@ -79,6 +81,12 @@ export const performOCR = async (
           height: imageBitmap.height
         });
       } catch (error) {
+        console.error('Failed to convert to ImageBitmap:', error);
+        
+        // Run diagnostic to provide detailed error information
+        const diagnosis = await diagnoseOCRIssues();
+        console.error('OCR diagnostic information:', diagnosis);
+        
         throw new Error(`Failed to convert file to ImageBitmap: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
@@ -89,6 +97,12 @@ export const performOCR = async (
       await ocrClient.loadImage(imageBitmap);
       console.log('Image loaded successfully');
     } catch (error) {
+      console.error('Failed to load image into OCR client:', error);
+      
+      // Run diagnostic to provide detailed error information
+      const diagnosis = await diagnoseOCRIssues();
+      console.error('OCR diagnostic information:', diagnosis);
+      
       throw new Error(`Failed to load image into OCR client: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -102,6 +116,12 @@ export const performOCR = async (
         console.warn('Warning: Extracted text is empty. The image may not contain readable text.');
       }
     } catch (error) {
+      console.error('Failed to extract text from image:', error);
+      
+      // Run diagnostic to provide detailed error information
+      const diagnosis = await diagnoseOCRIssues();
+      console.error('OCR diagnostic information:', diagnosis);
+      
       throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -130,6 +150,9 @@ export const performOCR = async (
         console.error('Error during cleanup after OCR failure:', cleanupError);
       }
     }
-    throw new Error(`Failed to process document with OCR: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to process document with OCR: ${errorMessage}. The browser may not support WASM or the OCR engine files may not be accessible.`);
   }
 };

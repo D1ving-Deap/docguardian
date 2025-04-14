@@ -6,6 +6,12 @@ export const TESSERACT_CONFIG = {
   workerPath: "/tessdata/tesseract-worker.js",
   corePath: "/tessdata/tesseract-core.wasm",
   trainingDataPath: "/tessdata/eng.traineddata",
+  // Add fallback paths in case primary paths fail
+  fallbackPaths: {
+    workerPath: "/tesseract-worker.js",
+    corePath: "/tesseract-core.wasm",
+    trainingDataPath: "/eng.traineddata",
+  }
 };
 
 // Function to check if a file exists by loading it
@@ -20,27 +26,87 @@ export const checkFileExists = async (url: string): Promise<boolean> => {
   }
 };
 
+// Enhanced file check with fallback paths
+export const checkFileWithFallback = async (primaryPath: string, fallbackPath: string): Promise<{
+  exists: boolean;
+  path: string;
+}> => {
+  // Try primary path first
+  const primaryExists = await checkFileExists(primaryPath);
+  if (primaryExists) {
+    console.log(`File found at primary path: ${primaryPath}`);
+    return { exists: true, path: primaryPath };
+  }
+  
+  // Try fallback path
+  console.log(`File not found at primary path, trying fallback: ${fallbackPath}`);
+  const fallbackExists = await checkFileExists(fallbackPath);
+  if (fallbackExists) {
+    console.log(`File found at fallback path: ${fallbackPath}`);
+    return { exists: true, path: fallbackPath };
+  }
+  
+  // Neither path worked
+  console.error(`File not found at either primary or fallback path`);
+  return { exists: false, path: primaryPath };
+};
+
 // Verify that all required OCR files exist
 export const verifyOCRFiles = async (): Promise<{
   success: boolean;
   missingFiles: string[];
   message: string;
+  workingPaths?: {
+    workerPath: string;
+    corePath: string;
+    trainingDataPath: string;
+  };
 }> => {
   const filesToCheck = [
-    { path: TESSERACT_CONFIG.workerPath, name: 'Worker JS' },
-    { path: TESSERACT_CONFIG.corePath, name: 'Core WASM' },
-    { path: TESSERACT_CONFIG.trainingDataPath, name: 'Training Data' }
+    { 
+      name: 'Worker JS', 
+      primaryPath: TESSERACT_CONFIG.workerPath, 
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths.workerPath 
+    },
+    { 
+      name: 'Core WASM', 
+      primaryPath: TESSERACT_CONFIG.corePath, 
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths.corePath 
+    },
+    { 
+      name: 'Training Data', 
+      primaryPath: TESSERACT_CONFIG.trainingDataPath, 
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths.trainingDataPath 
+    }
   ];
   
   const missingFiles: string[] = [];
+  const workingPaths: {
+    workerPath: string;
+    corePath: string;
+    trainingDataPath: string;
+  } = {
+    workerPath: TESSERACT_CONFIG.workerPath,
+    corePath: TESSERACT_CONFIG.corePath,
+    trainingDataPath: TESSERACT_CONFIG.trainingDataPath
+  };
   
   for (const file of filesToCheck) {
-    const exists = await checkFileExists(file.path);
-    if (!exists) {
+    const result = await checkFileWithFallback(file.primaryPath, file.fallbackPath);
+    if (!result.exists) {
       missingFiles.push(file.name);
-      console.error(`OCR file not found: ${file.name} at ${file.path}`);
+      console.error(`OCR file not found: ${file.name} at any location`);
     } else {
-      console.log(`OCR file verified: ${file.name} at ${file.path}`);
+      console.log(`OCR file verified: ${file.name} at ${result.path}`);
+      
+      // Update working paths with the path that actually worked
+      if (file.name === 'Worker JS') {
+        workingPaths.workerPath = result.path;
+      } else if (file.name === 'Core WASM') {
+        workingPaths.corePath = result.path;
+      } else if (file.name === 'Training Data') {
+        workingPaths.trainingDataPath = result.path;
+      }
     }
   }
   
@@ -48,14 +114,16 @@ export const verifyOCRFiles = async (): Promise<{
     return {
       success: false,
       missingFiles,
-      message: `Missing OCR files: ${missingFiles.join(', ')}`
+      message: `Missing OCR files: ${missingFiles.join(', ')}`,
+      workingPaths
     };
   }
   
   return {
     success: true,
     missingFiles: [],
-    message: 'All OCR files verified successfully'
+    message: 'All OCR files verified successfully',
+    workingPaths
   };
 };
 
@@ -71,13 +139,11 @@ export const createOCRClient = async (
     
     // First verify all required files exist
     const verificationResult = await verifyOCRFiles();
-    if (!verificationResult.success) {
-      throw new Error(verificationResult.message);
-    }
     
+    // Even if verification failed, we'll try to use the working paths we found
     const config = {
-      workerPath: TESSERACT_CONFIG.workerPath,
-      corePath: TESSERACT_CONFIG.corePath,
+      workerPath: verificationResult.workingPaths?.workerPath || TESSERACT_CONFIG.workerPath,
+      corePath: verificationResult.workingPaths?.corePath || TESSERACT_CONFIG.corePath,
       logger: options.logger || ((message: any) => {
         console.log('Tesseract message:', message);
         if (message.status === 'recognizing text' && options.progressCallback) {
@@ -99,8 +165,9 @@ export const createOCRClient = async (
       )
     ]) as OCRClient;
     
-    console.log('Loading OCR model from:', TESSERACT_CONFIG.trainingDataPath);
-    await client.loadModel(TESSERACT_CONFIG.trainingDataPath);
+    const trainingDataPath = verificationResult.workingPaths?.trainingDataPath || TESSERACT_CONFIG.trainingDataPath;
+    console.log('Loading OCR model from:', trainingDataPath);
+    await client.loadModel(trainingDataPath);
     console.log('OCR model loaded successfully');
     
     return client;

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { performOCR, extractFieldsFromText, analyzeForIssues, ExtractedFields } from '@/utils/ocrService';
 import { supabase } from "@/integrations/supabase/client";
-import { verifyOCRAssets, getVerificationErrorMessage } from '@/utils/ocrVerification';
+import { verifyOCRAssets, getVerificationErrorMessage, diagnoseOCRIssues } from '@/utils/ocrVerification';
 
 interface OCRProcessingResult {
   documentId: string;
@@ -29,6 +29,7 @@ export const useOCRProcessing = ({
   const [processingStage, setProcessingStage] = useState<string>('');
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<OCRProcessingResult | null>(null);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
   
   const processDocument = async (file: File) => {
     if (!file) return;
@@ -38,11 +39,18 @@ export const useOCRProcessing = ({
       setProcessingStage('Verifying OCR engine assets...');
       setProgress(5);
       
-      // Verify the OCR assets before processing
+      // Verify the OCR assets before processing with enhanced error handling
       const verificationResult = await verifyOCRAssets();
+      
+      // Even if verification fails, we'll try to proceed with the paths that were found
       if (!verificationResult.success) {
-        const errorMessage = getVerificationErrorMessage(verificationResult.missingFiles);
-        throw new Error(errorMessage);
+        console.warn('OCR asset verification failed, but will attempt to proceed:', 
+          verificationResult.message);
+          
+        // Store diagnostic information for debugging
+        const diagnosis = await diagnoseOCRIssues();
+        setDiagnosticInfo(diagnosis);
+        console.warn('OCR diagnostic information:', diagnosis);
       }
       
       setProcessingStage('Initializing WASM OCR engine...');
@@ -146,8 +154,38 @@ export const useOCRProcessing = ({
       return processingResult;
     } catch (error: any) {
       console.error('OCR processing error:', error);
-      onError?.(error);
-      throw error;
+      
+      // Generate enhanced error message with diagnostic information
+      let errorMessage = error.message || 'Unknown error occurred';
+      
+      // If we have diagnostic info, enhance the error message
+      if (diagnosticInfo) {
+        errorMessage += ' Browser and WASM compatibility information has been logged to the console.';
+        console.error('Diagnostic information:', diagnosticInfo);
+      }
+      
+      // If error message doesn't have specific details, try to get more specific
+      if (!errorMessage.includes('Failed to') && !errorMessage.includes('Missing')) {
+        // Run diagnostic to provide more helpful information
+        try {
+          const diagnosis = await diagnoseOCRIssues();
+          setDiagnosticInfo(diagnosis);
+          
+          // Add some helpful suggestions to the error message
+          if (diagnosis.suggestions.length > 0) {
+            errorMessage += ' Possible solutions: ' + diagnosis.suggestions[0];
+          }
+          
+          console.error('OCR diagnostic information:', diagnosis);
+        } catch (diagError) {
+          console.error('Failed to run diagnostics:', diagError);
+        }
+      }
+      
+      // Create error object with enhanced message
+      const enhancedError = new Error(errorMessage);
+      onError?.(enhancedError);
+      throw enhancedError;
     } finally {
       setIsProcessing(false);
     }
@@ -157,6 +195,7 @@ export const useOCRProcessing = ({
     setProgress(0);
     setProcessingStage('');
     setResult(null);
+    setDiagnosticInfo(null);
   };
   
   return {
@@ -164,6 +203,7 @@ export const useOCRProcessing = ({
     processingStage,
     progress,
     result,
+    diagnosticInfo,
     processDocument,
     reset
   };
