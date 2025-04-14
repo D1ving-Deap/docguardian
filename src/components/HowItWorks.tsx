@@ -48,7 +48,7 @@ const HowItWorks: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold mb-3">Secure Document Upload</h3>
               <p className="text-gray-600">
-                Documents are securely uploaded to our cloud platform with end-to-end encryption and access controls to protect sensitive information.
+                Documents are processed securely in the browser with in-browser OCR technology, protecting sensitive information with client-side processing.
               </p>
             </div>
 
@@ -76,4 +76,5 @@ const HowItWorks: React.FC = () => {
       </div>
     </section>;
 };
+
 export default HowItWorks;
