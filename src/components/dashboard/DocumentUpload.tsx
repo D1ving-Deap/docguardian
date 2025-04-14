@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, X, Loader2, Upload, CheckCircle2 } from "lucide-react";
 import { supabase, supabaseUrl } from "@/integrations/supabase/client";
 import storage from '@/utils/supabaseStorage';
+import { createWorker } from 'tesseract.js';
 
 // DocumentUpload Component Props
 interface DocumentUploadProps {
@@ -18,7 +20,7 @@ interface DocumentUploadProps {
 const DocumentUpload = ({ 
   label, 
   description, 
-  acceptTypes = "application/pdf", 
+  acceptTypes = "application/pdf,image/jpeg,image/png,image/tiff", 
   documentType,
   applicationId,
   onChange 
@@ -26,6 +28,7 @@ const DocumentUpload = ({
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
   const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<any>(null);
   
@@ -33,22 +36,22 @@ const DocumentUpload = ({
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      // Check file size (20MB max for local OCR processing)
-      if (selectedFile.size > 20 * 1024 * 1024) {
+      // Check file size (50MB max)
+      if (selectedFile.size > 50 * 1024 * 1024) {
         toast({
           title: "File too large",
-          description: "Maximum file size is 20MB",
+          description: "Maximum file size is 50MB",
           variant: "destructive"
         });
         return;
       }
       
-      // Validate file type (PDF or common image formats)
+      // Validate file type
       if (!selectedFile.type.includes('pdf') && 
           !selectedFile.type.includes('image/')) {
         toast({
           title: "Invalid file type",
-          description: "Please upload a PDF file or image (JPG, PNG)",
+          description: "Please upload a PDF file or image (JPG, PNG, TIFF)",
           variant: "destructive"
         });
         return;
@@ -58,14 +61,105 @@ const DocumentUpload = ({
     }
   };
   
+  // Function to extract text using Tesseract WASM
+  const extractTextWithTesseract = async (imageUrl: string): Promise<{ text: string, extractedFields?: any }> => {
+    setProcessingStatus('Initializing OCR engine...');
+    
+    try {
+      // Initialize Tesseract worker with English language
+      const worker = await createWorker('eng');
+      
+      setProcessingStatus('Reading document text...');
+      
+      // Recognize text from image
+      const result = await worker.recognize(imageUrl);
+      
+      setProcessingStatus('Extracting data from text...');
+      
+      // Basic field extraction based on document type
+      // This is a simple implementation - in production you'd want more sophisticated extraction
+      const extractedFields = extractFieldsFromText(result.data.text, documentType);
+      
+      // Terminate worker to free resources
+      await worker.terminate();
+      
+      return { 
+        text: result.data.text,
+        extractedFields
+      };
+    } catch (error) {
+      console.error('Tesseract OCR error:', error);
+      throw new Error('Failed to extract text from document');
+    }
+  };
+  
+  // Simple field extraction from text (can be enhanced with better algorithms)
+  const extractFieldsFromText = (text: string, docType: string): any => {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const extractedFields: Record<string, string> = {};
+    
+    // Different extraction logic based on document type
+    if (docType.toLowerCase().includes('income') || docType.toLowerCase().includes('pay')) {
+      // Extract income information
+      const incomeRegex = /\$?(\d{1,3}(,\d{3})*(\.\d{2})?)/g;
+      const incomeMatches = text.match(incomeRegex);
+      
+      if (incomeMatches && incomeMatches.length > 0) {
+        extractedFields.income = incomeMatches[0];
+      }
+      
+      // Extract dates
+      const dateRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
+      const dateMatches = text.match(dateRegex);
+      
+      if (dateMatches && dateMatches.length > 0) {
+        extractedFields.statementDate = dateMatches[0];
+      }
+    } 
+    else if (docType.toLowerCase().includes('id') || docType.toLowerCase().includes('license')) {
+      // Extract name (simple implementation)
+      for (const line of lines) {
+        if (line.toLowerCase().includes('name:')) {
+          extractedFields.name = line.split(':')[1]?.trim() || '';
+          break;
+        }
+      }
+      
+      // Extract DOB
+      const dobRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
+      const dobMatches = text.match(dobRegex);
+      
+      if (dobMatches && dobMatches.length > 0) {
+        extractedFields.dateOfBirth = dobMatches[0];
+      }
+      
+      // Extract ID number (simple implementation)
+      const idRegex = /\b[A-Z0-9]{6,15}\b/g;
+      const idMatches = text.match(idRegex);
+      
+      if (idMatches && idMatches.length > 0) {
+        extractedFields.idNumber = idMatches[0];
+      }
+    }
+    
+    // Add metadata for fraud detection demo
+    extractedFields.metadata = {
+      processed: new Date().toISOString(),
+      confidence: Math.random() * 100, // Demo value
+      edited: Math.random() < 0.2 // Random flag for demo
+    };
+    
+    return extractedFields;
+  };
+  
   const handleUpload = async () => {
     if (!file || !applicationId) return;
     
     setIsUploading(true);
+    setProcessingStatus('Uploading document...');
     
     try {
       // First, upload the file to Supabase Storage
-      // Generate a sanitized file path with proper encoding
       const timestamp = new Date().getTime();
       const safeName = encodeURIComponent(file.name.replace(/[^a-zA-Z0-9.-]/g, '_'));
       const filePath = `${applicationId}/${documentType}/${timestamp}_${safeName}`;
@@ -79,19 +173,60 @@ const DocumentUpload = ({
         throw new Error(uploadResult.error);
       }
       
-      // Now, create a FormData for the edge function
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('applicationId', applicationId);
-      formData.append('documentType', documentType);
-      formData.append('filePath', uploadResult.key);
+      setProcessingStatus('Processing document with browser-based OCR...');
       
-      console.log(`Uploaded to ${uploadResult.key}, calling process-document function...`);
+      // For images, we can extract text directly with Tesseract
+      let ocrResult: { text: string, extractedFields?: any } = { text: '' };
       
-      // Call our edge function to process the document with local OCR server
+      // Create object URL for the file so Tesseract can process it
+      const objectUrl = URL.createObjectURL(file);
+      
+      try {
+        ocrResult = await extractTextWithTesseract(objectUrl);
+      } finally {
+        // Clean up object URL
+        URL.revokeObjectURL(objectUrl);
+      }
+      
+      setProcessingStatus('Saving document information...');
+      
+      // Create a new document record in the database
+      const documentId = crypto.randomUUID();
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .insert({
+          id: documentId,
+          application_id: applicationId,
+          document_type: documentType,
+          filename: file.name,
+          file_path: uploadResult.key,
+          raw_text: ocrResult.text || '',
+          structured_data: ocrResult.extractedFields || {}
+        })
+        .select();
+      
+      if (docError) {
+        console.error('Error storing document metadata:', docError);
+        throw new Error(`Database error: ${docError.message}`);
+      }
+      
+      // Check for potential fraud based on document type
+      setProcessingStatus('Running fraud checks...');
+      
+      // Call our edge function to validate the document and check for fraud
+      // This still uses our edge function for server-side fraud detection
       const response = await fetch(`${supabaseUrl}/functions/v1/process-document`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentId,
+          applicationId,
+          documentType,
+          extractedText: ocrResult.text,
+          extractedFields: ocrResult.extractedFields
+        })
       });
       
       if (!response.ok) {
@@ -103,14 +238,14 @@ const DocumentUpload = ({
       
       toast({
         title: "Document Processed",
-        description: "File uploaded and processed successfully using local OCR"
+        description: "File uploaded and processed successfully with browser-based OCR"
       });
       
-      setUploadedDocId(result.documentId);
-      setExtractedData(result.extractedFields);
+      setUploadedDocId(documentId);
+      setExtractedData(ocrResult.extractedFields);
       
       if (onChange) {
-        onChange(result.documentId, result.extractedFields);
+        onChange(documentId, ocrResult.extractedFields);
       }
     } catch (error: any) {
       console.error('Document processing error:', error);
@@ -121,6 +256,7 @@ const DocumentUpload = ({
       });
     } finally {
       setIsUploading(false);
+      setProcessingStatus('');
     }
   };
   
@@ -143,7 +279,7 @@ const DocumentUpload = ({
         <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
           <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
           <p className="text-sm text-center text-muted-foreground mb-2">
-            Upload PDF or image for automatic text extraction via local OCR
+            Upload PDF or image for automatic text extraction via browser-based OCR
           </p>
           <input
             type="file"
@@ -176,24 +312,30 @@ const DocumentUpload = ({
           </div>
           
           {!uploadedDocId ? (
-            <Button 
-              onClick={handleUpload} 
-              disabled={isUploading} 
-              className="w-full"
-              size="sm"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing with local OCR...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Process with local OCR
-                </>
+            <div className="space-y-3">
+              {processingStatus && (
+                <div className="text-xs text-muted-foreground">{processingStatus}</div>
               )}
-            </Button>
+              
+              <Button 
+                onClick={handleUpload} 
+                disabled={isUploading} 
+                className="w-full"
+                size="sm"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing with browser OCR...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Process with browser OCR
+                  </>
+                )}
+              </Button>
+            </div>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center text-green-600 text-sm">
@@ -205,12 +347,17 @@ const DocumentUpload = ({
                 <div className="mt-3 border rounded p-3 bg-gray-50">
                   <h4 className="text-sm font-medium mb-2">Extracted Information</h4>
                   <div className="space-y-1 text-sm">
-                    {Object.entries(extractedData).map(([key, value]) => (
-                      <div key={key} className="grid grid-cols-3 gap-2">
-                        <span className="text-gray-500 font-medium">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</span>
-                        <span className="col-span-2">{value as string}</span>
-                      </div>
-                    ))}
+                    {Object.entries(extractedData).map(([key, value]) => {
+                      // Skip metadata object from display
+                      if (key === "metadata" && typeof value === "object") return null;
+                      
+                      return (
+                        <div key={key} className="grid grid-cols-3 gap-2">
+                          <span className="text-gray-500 font-medium">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</span>
+                          <span className="col-span-2">{value as string}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
