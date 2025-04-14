@@ -20,10 +20,34 @@ const expectedPaths = {
 
 // List of required files to check
 const requiredFiles = [
-  { name: 'tesseract-core.wasm', path: 'tesseract-core.wasm', minSize: 1024 * 1024 }, // At least 1MB
-  { name: 'tesseract-worker.js', path: 'tesseract-worker.js', minSize: 10 * 1024 }, // At least 10KB
-  { name: 'eng.traineddata', path: 'eng.traineddata', minSize: 10 * 1024 * 1024 } // At least 10MB
+  {
+    name: 'tesseract-core.wasm',
+    path: 'tesseract-core.wasm',
+    minSize: 1024 * 1024, // 1MB
+    url: 'https://github.com/zliide/tesseract-wasm/raw/master/dist/tesseract-core.wasm',
+  },
+  {
+    name: 'tesseract-worker.js',
+    path: 'tesseract-worker.js',
+    minSize: 10 * 1024, // 10KB
+    url: 'https://github.com/zliide/tesseract-wasm/raw/master/dist/tesseract-worker.js',
+  },
+  {
+    name: 'eng.traineddata',
+    path: 'eng.traineddata',
+    minSize: 10 * 1024 * 1024, // 10MB
+    url: 'https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata',
+  },
 ];
+
+// Download missing files
+for (const file of requiredFiles) {
+  const filePath = path.join(publicTessDataDir, file.path);
+  if (!fs.existsSync(filePath)) {
+    console.log(`Downloading missing file: ${file.name}`);
+    await downloadFile(file.url, filePath);
+  }
+}
 
 // Check if directory exists
 if (!fs.existsSync(publicTessDataDir)) {
