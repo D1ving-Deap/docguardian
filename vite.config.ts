@@ -1,5 +1,5 @@
 
-import { defineConfig } from "vite";
+import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
@@ -15,17 +15,21 @@ export default defineConfig(({ mode }) => ({
     // but import it dynamically to avoid ESM/CJS conflicts
     mode === 'development' && {
       name: 'dynamic-tagger',
-      async configResolved() {
+      async configResolved(config) {
         // This creates a dynamic import which works with ESM modules
         try {
           const { componentTagger } = await import('lovable-tagger');
-          return componentTagger();
+          const plugin = componentTagger();
+          // Apply the plugin configuration but don't return anything (void)
+          if (plugin.configResolved) {
+            await plugin.configResolved(config);
+          }
         } catch (error) {
           console.warn('Could not load lovable-tagger:', error);
-          return {};
         }
+        // Return void to match the expected return type
       }
-    },
+    } as Plugin,
   ].filter(Boolean),
   resolve: {
     alias: {
