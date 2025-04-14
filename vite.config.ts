@@ -22,7 +22,12 @@ export default defineConfig(({ mode }) => ({
           const plugin = componentTagger();
           // Apply the plugin configuration but don't return anything (void)
           if (plugin.configResolved) {
-            await plugin.configResolved(config);
+            // Instead of calling directly, we check if it's an object with handler or a function
+            if (typeof plugin.configResolved === 'function') {
+              await plugin.configResolved(config);
+            } else if (plugin.configResolved.handler) {
+              await plugin.configResolved.handler(config);
+            }
           }
         } catch (error) {
           console.warn('Could not load lovable-tagger:', error);
