@@ -1,14 +1,15 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from "@/components/ui/toaster";
 
-import Index from './routes/Index';
-import Login from './routes/Login';
-import ResetPassword from './routes/ResetPassword';
-import VerifyEmail from './routes/VerifyEmail';
-import Dashboard from './routes/Dashboard';
-import NotFound from './routes/NotFound';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+import Index from './pages/Index';
+import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
+import Dashboard from './pages/Dashboard';
+import NotFound from './pages/NotFound';
+import ProtectedRoute from './components/ProtectedRoute';
 import OCRTestPage from './routes/OCRTestPage';
 
 function App() {
