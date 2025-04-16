@@ -46,6 +46,22 @@ async function downloadFileWithRetry(urlArray, dest) {
     
     try {
       await downloadFile(url, dest);
+      
+      // For WASM files, verify they're valid
+      if (dest.endsWith('.wasm')) {
+        console.log(`Verifying downloaded WASM file: ${dest}`);
+        const isValid = isValidWasmFile(dest);
+        if (!isValid) {
+          console.error(`❌ Invalid WASM file downloaded from ${url}`);
+          if (i === urlArray.length - 1) {
+            throw new Error(`All download attempts produced invalid WASM files for ${dest}`);
+          }
+          console.log(`Trying next source...`);
+          continue; // Skip to next URL since this one didn't work
+        }
+        console.log(`✅ Valid WASM file downloaded from ${url}`);
+      }
+      
       return true; // Download successful
     } catch (error) {
       console.error(`Error downloading from ${url}:`, error.message);
@@ -177,6 +193,71 @@ async function copyToRootPublic() {
   }
 }
 
+// Download directly from node_modules as last resort
+async function copyFromNodeModules() {
+  console.log('Attempting to copy files from node_modules as last resort...');
+  
+  try {
+    // Check if tesseract-wasm package is installed
+    const nodeModulesPath = path.resolve(__dirname, '../node_modules/tesseract-wasm/dist');
+    const trainingDataPath = path.resolve(__dirname, '../node_modules/tesseract-wasm/tessdata');
+    
+    if (fs.existsSync(nodeModulesPath)) {
+      console.log('tesseract-wasm found in node_modules, copying files...');
+      
+      // Copy worker.js
+      const workerSrc = path.join(nodeModulesPath, 'tesseract-worker.js');
+      const workerDest = path.join(destDir, 'tesseract-worker.js');
+      
+      if (fs.existsSync(workerSrc)) {
+        fs.copyFileSync(workerSrc, workerDest);
+        console.log(`✅ Copied worker.js from node_modules`);
+        
+        // Also copy to root
+        fs.copyFileSync(workerSrc, path.join(rootDir, 'tesseract-worker.js'));
+      }
+      
+      // Copy wasm file
+      const wasmSrc = path.join(nodeModulesPath, 'tesseract-core.wasm');
+      const wasmDest = path.join(destDir, 'tesseract-core.wasm');
+      
+      if (fs.existsSync(wasmSrc)) {
+        fs.copyFileSync(wasmSrc, wasmDest);
+        console.log(`✅ Copied tesseract-core.wasm from node_modules`);
+        
+        // Also copy to root
+        fs.copyFileSync(wasmSrc, path.join(rootDir, 'tesseract-core.wasm'));
+        
+        // Verify WASM file
+        const isValid = isValidWasmFile(wasmDest);
+        if (isValid) {
+          console.log(`✅ WASM file from node_modules is valid`);
+        } else {
+          console.error(`❌ WASM file from node_modules is invalid!`);
+        }
+      }
+      
+      // Copy training data
+      if (fs.existsSync(trainingDataPath)) {
+        const trainSrc = path.join(trainingDataPath, 'eng.traineddata');
+        const trainDest = path.join(destDir, 'eng.traineddata');
+        
+        if (fs.existsSync(trainSrc)) {
+          fs.copyFileSync(trainSrc, trainDest);
+          console.log(`✅ Copied eng.traineddata from node_modules`);
+          
+          // Also copy to root
+          fs.copyFileSync(trainSrc, path.join(rootDir, 'eng.traineddata'));
+        }
+      }
+    } else {
+      console.log('tesseract-wasm not found in node_modules');
+    }
+  } catch (error) {
+    console.error('Error copying from node_modules:', error);
+  }
+}
+
 // Perform downloads
 async function downloadFiles() {
   for (const [filename, urls] of Object.entries(fileUrls)) {
@@ -203,22 +284,6 @@ async function downloadFiles() {
           const isValidNow = isValidWasmFile(destPath);
           if (!isValidNow) {
             console.error(`❌ Still not a valid WebAssembly file from direct unpkg!`);
-            
-            // Try copying directly from local node_modules
-            const nodeModulesPath = path.resolve(__dirname, '../node_modules/tesseract-wasm/dist/tesseract-core.wasm');
-            if (fs.existsSync(nodeModulesPath)) {
-              console.log(`Copying directly from node_modules: ${nodeModulesPath}`);
-              fs.copyFileSync(nodeModulesPath, destPath);
-              
-              const isCopyValid = isValidWasmFile(destPath);
-              if (isCopyValid) {
-                console.log(`✅ Successfully copied valid WASM file from node_modules!`);
-              } else {
-                console.error(`❌ WASM file from node_modules is also invalid!`);
-              }
-            } else {
-              console.error(`❌ No WASM file found in node_modules!`);
-            }
           } else {
             console.log(`✅ Successfully downloaded valid WebAssembly file from unpkg!`);
           }
@@ -231,25 +296,56 @@ async function downloadFiles() {
   
   await copyToRootPublic();
   
+  // As a last resort, try to copy files directly from node_modules
+  let needNodeModules = false;
+  
+  for (const filename of Object.keys(fileUrls)) {
+    const filePath = path.join(destDir, filename);
+    if (!fs.existsSync(filePath)) {
+      needNodeModules = true;
+      break;
+    }
+    
+    // Also check if WASM file is valid
+    if (filename.endsWith('.wasm') && !isValidWasmFile(filePath)) {
+      needNodeModules = true;
+      break;
+    }
+  }
+  
+  if (needNodeModules) {
+    await copyFromNodeModules();
+  }
+  
   console.log('Download process complete');
   
   // Verify files
   let allFilesExist = true;
+  let wasmIsValid = true;
+  
   for (const filename of Object.keys(fileUrls)) {
     const filePath = path.join(destDir, filename);
     if (fs.existsSync(filePath)) {
       const stats = fs.statSync(filePath);
       console.log(`✅ ${filename}: Found (${(stats.size / 1024).toFixed(2)} KB)`);
+      
+      // Verify WASM file
+      if (filename.endsWith('.wasm')) {
+        wasmIsValid = isValidWasmFile(filePath);
+        if (!wasmIsValid) {
+          console.error(`❌ ${filename}: INVALID FORMAT`);
+        }
+      }
     } else {
       console.error(`❌ ${filename}: MISSING`);
       allFilesExist = false;
     }
   }
   
-  if (allFilesExist) {
+  if (allFilesExist && wasmIsValid) {
     console.log('\n✅ All Tesseract files are ready to use!');
   } else {
-    console.error('\n❌ Some files are missing. OCR functionality may not work correctly.');
+    console.error('\n❌ Some files are missing or invalid. OCR functionality may not work correctly.');
   }
 }
 

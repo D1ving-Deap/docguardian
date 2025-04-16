@@ -50,7 +50,7 @@ export const checkFileWithFallback = async (
 export const validateWasmFile = async (url: string): Promise<boolean> => {
   try {
     console.log(`Validating WASM file at ${url}`);
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
       console.error(`Failed to fetch WASM file for validation: ${response.status}`);
       return false;
@@ -151,73 +151,25 @@ export const createOCRClient = async (
   try {
     console.log('Setting up OCR client configuration...');
     
-    // First verify all required files exist
-    const filesVerification = await verifyOCRFiles();
-    if (!filesVerification.success) {
-      console.warn('OCR file verification failed:', filesVerification.message);
-      console.warn('Attempting to proceed anyway with fallback paths...');
+    // First verify the WASM file
+    const wasmValidation = await validateWasmFile(TESSERACT_CONFIG.corePath);
+    
+    if (!wasmValidation) {
+      console.error('WASM file validation failed for primary path, trying fallback');
       
-      // If we have missing or invalid files, try the fallback paths
-      let workingWasmPath = TESSERACT_CONFIG.corePath;
-      let workingWorkerPath = TESSERACT_CONFIG.workerPath;
-      let workingTrainingPath = TESSERACT_CONFIG.trainingDataPath;
+      // Try fallback path
+      const fallbackValidation = await validateWasmFile(TESSERACT_CONFIG.fallbackPaths.corePath);
       
-      // Try WASM file fallback if needed
-      if (filesVerification.missingFiles.some(name => name.includes('WASM'))) {
-        const wasmResult = await checkFileWithFallback(
-          TESSERACT_CONFIG.corePath, 
-          TESSERACT_CONFIG.fallbackPaths.corePath
-        );
-        
-        if (wasmResult.exists) {
-          workingWasmPath = wasmResult.path;
-          console.log(`Using working WASM path: ${workingWasmPath}`);
-          
-          // Validate the WASM file
-          const isValidWasm = await validateWasmFile(workingWasmPath);
-          if (!isValidWasm) {
-            console.error(`Fallback WASM file is also invalid!`);
-            throw new Error('All WASM files have invalid format. Please run the copy-tesseract-files.js script again.');
-          }
-        } else {
-          throw new Error('No valid WASM file found at any location');
-        }
+      if (!fallbackValidation) {
+        throw new Error('All WASM files have invalid format. Please run the copy-tesseract-files.js script again.');
       }
       
-      // Try worker file fallback if needed
-      if (filesVerification.missingFiles.some(name => name.includes('Worker'))) {
-        const workerResult = await checkFileWithFallback(
-          TESSERACT_CONFIG.workerPath, 
-          TESSERACT_CONFIG.fallbackPaths.workerPath
-        );
-        
-        if (workerResult.exists) {
-          workingWorkerPath = workerResult.path;
-          console.log(`Using working worker path: ${workingWorkerPath}`);
-        } else {
-          throw new Error('No worker JS file found at any location');
-        }
-      }
+      console.log('Fallback WASM file is valid, using fallback configuration');
       
-      // Try training data fallback if needed
-      if (filesVerification.missingFiles.some(name => name.includes('Training'))) {
-        const trainingResult = await checkFileWithFallback(
-          TESSERACT_CONFIG.trainingDataPath, 
-          TESSERACT_CONFIG.fallbackPaths.trainingDataPath
-        );
-        
-        if (trainingResult.exists) {
-          workingTrainingPath = trainingResult.path;
-          console.log(`Using working training data path: ${workingTrainingPath}`);
-        } else {
-          throw new Error('No training data file found at any location');
-        }
-      }
-      
-      // Initialize OCR client with working paths
+      // Use fallback paths
       const config = {
-        workerPath: workingWorkerPath,
-        corePath: workingWasmPath,
+        workerPath: TESSERACT_CONFIG.fallbackPaths.workerPath,
+        corePath: TESSERACT_CONFIG.fallbackPaths.corePath,
         logger: options.logger || ((message: any) => {
           console.log('Tesseract message:', message);
           if (message.status === 'recognizing text' && options.progressCallback) {
@@ -226,22 +178,28 @@ export const createOCRClient = async (
         })
       };
       
-      console.log('Initializing OCR client with fallback config:', config);
-      
+      console.log('Creating OCR client with fallback configuration');
       const client = new OCRClient(config);
       
       try {
-        await client.loadModel(workingTrainingPath);
+        await client.loadModel(TESSERACT_CONFIG.fallbackPaths.trainingDataPath);
         console.log('OCR model loaded successfully with fallback paths');
+        return client;
       } catch (modelError) {
         console.error('Failed to load OCR model with fallback paths:', modelError);
-        throw new Error(`Failed to load OCR model: ${modelError instanceof Error ? modelError.message : 'Unknown error'}`);
+        
+        // Try one more attempt with primary training data path
+        try {
+          await client.loadModel(TESSERACT_CONFIG.trainingDataPath);
+          console.log('OCR model loaded successfully with mixed paths');
+          return client;
+        } catch (finalError) {
+          throw new Error(`Failed to load OCR model: ${finalError instanceof Error ? finalError.message : 'Unknown error'}`);
+        }
       }
-      
-      return client;
     }
     
-    // All files verified, use primary paths
+    // Primary WASM is valid, use primary paths
     const config = {
       workerPath: TESSERACT_CONFIG.workerPath,
       corePath: TESSERACT_CONFIG.corePath,
@@ -253,19 +211,17 @@ export const createOCRClient = async (
       })
     };
 
-    console.log('Initializing OCR client with config:', config);
-    
+    console.log('Creating OCR client with primary configuration');
     const client = new OCRClient(config);
     
     try {
       await client.loadModel(TESSERACT_CONFIG.trainingDataPath);
-      console.log('OCR model loaded successfully');
+      console.log('OCR model loaded successfully with primary paths');
+      return client;
     } catch (modelError) {
-      console.error('Failed to load OCR model:', modelError);
+      console.error('Failed to load OCR model with primary paths:', modelError);
       throw new Error(`Failed to load OCR model: ${modelError instanceof Error ? modelError.message : 'Unknown error'}`);
     }
-    
-    return client;
   } catch (error) {
     console.error('Error initializing OCR client:', error);
     throw new Error(`Failed to initialize OCR client: ${error instanceof Error ? error.message : 'Unknown error'}`);
