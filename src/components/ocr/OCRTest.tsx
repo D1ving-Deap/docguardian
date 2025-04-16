@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { performOCR } from '@/utils/tesseractOCR';
 import { Progress } from "@/components/ui/progress";
 import { Loader2, FileUp, FileText, CheckCircle2, X, AlertTriangle } from "lucide-react";
-import { verifyOCRFiles, TESSERACT_CONFIG } from '@/utils/tesseractConfig';
+import { verifyOCRFiles, TESSERACT_CONFIG, validateWasmFile, checkFileExists } from '@/utils/tesseractConfig';
 
 const OCRTest: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);

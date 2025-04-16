@@ -1,5 +1,4 @@
-
-import { TESSERACT_CONFIG, checkFileExists, checkFileWithFallback } from './tesseractConfig';
+import { TESSERACT_CONFIG, checkFileExists, checkFileWithFallback, validateWasmFile } from './tesseractConfig';
 
 /**
  * Verifies that all required OCR WASM assets are available
