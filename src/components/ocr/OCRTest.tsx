@@ -22,6 +22,11 @@ const OCRTest: React.FC = () => {
   const [fixResult, setFixResult] = useState<any>(null);
   const [directDownloadAttempted, setDirectDownloadAttempted] = useState(false);
 
+  // Get cached WASM blob URL if available
+  const getCachedWasmBlob = () => {
+    return createWasmBlobUrl();
+  };
+
   useEffect(() => {
     const checkAssets = async () => {
       try {
@@ -29,7 +34,7 @@ const OCRTest: React.FC = () => {
         console.log('Checking OCR assets availability...');
         
         // Check if we already have a cached WASM file from a previous direct download
-        const cachedWasmBlob = createWasmBlobUrl();
+        const cachedWasmBlob = getCachedWasmBlob();
         if (cachedWasmBlob) {
           console.log('Using cached WASM blob URL:', cachedWasmBlob);
           sessionStorage.setItem('ocr-wasm-path', cachedWasmBlob);
@@ -99,7 +104,7 @@ const OCRTest: React.FC = () => {
     try {
       // Check for cached WASM blob URL first
       let wasmOptions: any = {};
-      const cachedWasmBlob = createWasmBlobUrl();
+      const cachedWasmBlob = getCachedWasmBlob();
       
       if (cachedWasmBlob) {
         console.log('Using cached WASM blob URL:', cachedWasmBlob);
@@ -160,7 +165,7 @@ const OCRTest: React.FC = () => {
       
       if (success) {
         // Create blob URL from the cached WASM binary
-        const blobUrl = createWasmBlobUrl();
+        const blobUrl = getCachedWasmBlob();
         if (blobUrl) {
           sessionStorage.setItem('ocr-wasm-path', blobUrl);
           
@@ -367,7 +372,7 @@ const OCRTest: React.FC = () => {
                 <div className="mt-1 text-green-600">
                   Using custom WASM path: {sessionStorage.getItem('ocr-wasm-path')}
                 </div>
-              ) : cachedWasmBlob ? (
+              ) : getCachedWasmBlob() ? (
                 <div className="mt-1 text-green-600">
                   Using WASM from browser cache (downloaded from {sessionStorage.getItem('ocr-wasm-source') || 'unknown source'})
                 </div>
