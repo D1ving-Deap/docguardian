@@ -5,7 +5,12 @@ import { OCRClient } from 'tesseract-wasm';
 export const TESSERACT_CONFIG = {
   workerPath: "/tessdata/tesseract-worker.js",
   corePath: "/tessdata/tesseract-core.wasm",
-  trainingDataPath: "/tessdata/eng.traineddata"
+  trainingDataPath: "/tessdata/eng.traineddata",
+  fallbackPaths: {
+    workerPath: "/tesseract-worker.js",
+    corePath: "/tesseract-core.wasm",
+    trainingDataPath: "/eng.traineddata"
+  }
 };
 
 // Function to check if a file exists by loading it
@@ -18,6 +23,27 @@ export const checkFileExists = async (url: string): Promise<boolean> => {
     console.error(`Failed to check if file exists at ${url}:`, error);
     return false;
   }
+};
+
+// Check file with fallback if primary path doesn't work
+export const checkFileWithFallback = async (
+  primaryPath: string, 
+  fallbackPath: string
+): Promise<{ exists: boolean; path: string }> => {
+  // First try the primary path
+  const primaryExists = await checkFileExists(primaryPath);
+  if (primaryExists) {
+    return { exists: true, path: primaryPath };
+  }
+  
+  // If primary path fails, try the fallback
+  console.log(`Primary path failed (${primaryPath}), trying fallback (${fallbackPath})`);
+  const fallbackExists = await checkFileExists(fallbackPath);
+  
+  return { 
+    exists: fallbackExists,
+    path: fallbackExists ? fallbackPath : primaryPath // Return fallback if it exists, otherwise return primary
+  };
 };
 
 // Verify that all required OCR files exist
