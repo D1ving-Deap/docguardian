@@ -2,7 +2,10 @@
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient, verifyOCRFiles } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
-import { diagnoseOCRIssues } from './ocrVerification';
+import { diagnoseOCRIssues, testWorkerInitialization } from './ocrVerification';
+
+// Check if we're running in the browser
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
 
 // Diagnostic function to check file type and provide helpful info
 const validateFile = (file: File | Blob | ImageBitmap): { valid: boolean; details: string } => {
@@ -31,7 +34,34 @@ const validateFile = (file: File | Blob | ImageBitmap): { valid: boolean; detail
   return { valid: false, details: 'Invalid file type: must be File, Blob, or ImageBitmap' };
 };
 
-// Extract text from image or PDF using tesseract-wasm
+// Basic browser environment check
+const checkEnvironment = (): { supported: boolean; issues: string[] } => {
+  const issues: string[] = [];
+  
+  if (!isBrowser) {
+    issues.push('Not running in a browser environment');
+    return { supported: false, issues };
+  }
+  
+  if (typeof WebAssembly !== 'object') {
+    issues.push('WebAssembly not supported in this browser');
+    return { supported: false, issues };
+  }
+  
+  if (typeof Worker !== 'function') {
+    issues.push('Web Workers not supported in this browser');
+    return { supported: false, issues };
+  }
+  
+  if (typeof createImageBitmap !== 'function') {
+    issues.push('createImageBitmap not supported in this browser');
+    return { supported: false, issues };
+  }
+  
+  return { supported: true, issues };
+};
+
+// Extract text from image or PDF using tesseract-wasm with enhanced error handling
 export const performOCR = async (
   file: File | Blob | ImageBitmap,
   progressCallback?: (progress: number) => void
@@ -39,7 +69,14 @@ export const performOCR = async (
   let ocrClient: OCRClient | null = null;
   
   try {
-    // Validate the file first
+    // Environment check first
+    console.log('Checking browser environment...');
+    const envCheck = checkEnvironment();
+    if (!envCheck.supported) {
+      throw new Error(`Browser environment issues: ${envCheck.issues.join(', ')}`);
+    }
+    
+    // Validate the file
     console.log('Starting OCR processing...');
     const validation = validateFile(file);
     console.log('File validation:', validation);
@@ -48,23 +85,50 @@ export const performOCR = async (
       throw new Error(validation.details);
     }
     
+    // Test if Web Workers can be initialized
+    console.log('Testing Web Worker initialization...');
+    const workerTest = await testWorkerInitialization();
+    if (!workerTest.success) {
+      console.error('Worker initialization test failed:', workerTest.error);
+      // Continue anyway, but log the issue
+    } else {
+      console.log('Worker initialization test succeeded');
+    }
+    
     // Verify OCR files are available with enhanced error handling
     console.log('Verifying OCR files are available...');
     const filesVerification = await verifyOCRFiles();
     if (!filesVerification.success) {
       console.error('OCR file verification failed. Attempting to proceed with available files...');
+      console.error('Missing files:', filesVerification.missingFiles);
+      
       // We will still try to proceed with the paths that were found
+      if (filesVerification.workingPaths) {
+        console.log('Using detected working paths:', filesVerification.workingPaths);
+      }
     }
     
     console.log('Starting OCR processing for file:', file instanceof File ? file.name : 'blob or image');
     
     // Initialize OCR client with progress callback and detected working paths
-    ocrClient = await createOCRClient({
-      progressCallback,
-      logger: (message) => {
-        console.log('Tesseract progress:', message);
-      }
-    });
+    try {
+      console.log('Creating OCR client...');
+      ocrClient = await createOCRClient({
+        progressCallback,
+        logger: (message) => {
+          console.log('Tesseract progress:', message);
+        }
+      });
+      console.log('OCR client created successfully');
+    } catch (error) {
+      console.error('Error creating OCR client:', error);
+      
+      // Run diagnostic to provide detailed error information
+      const diagnosis = await diagnoseOCRIssues();
+      console.error('OCR diagnostic information:', diagnosis);
+      
+      throw new Error(`Failed to initialize OCR client: ${error instanceof Error ? error.message : 'Unknown error'}. ${diagnosis.suggestions[0] || ''}`);
+    }
     
     // Handle different input types
     let imageBitmap: ImageBitmap;
@@ -87,7 +151,8 @@ export const performOCR = async (
         const diagnosis = await diagnoseOCRIssues();
         console.error('OCR diagnostic information:', diagnosis);
         
-        throw new Error(`Failed to convert file to ImageBitmap: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(`Failed to convert file to ImageBitmap: ${error instanceof Error ? error.message : 'Unknown error'}. 
+          Try using a different image format or browser.`);
       }
     }
     
@@ -103,7 +168,8 @@ export const performOCR = async (
       const diagnosis = await diagnoseOCRIssues();
       console.error('OCR diagnostic information:', diagnosis);
       
-      throw new Error(`Failed to load image into OCR client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to load image into OCR client: ${error instanceof Error ? error.message : 'Unknown error'}.
+        The image may be corrupted or in an unsupported format.`);
     }
     
     // Get the recognized text
@@ -122,7 +188,8 @@ export const performOCR = async (
       const diagnosis = await diagnoseOCRIssues();
       console.error('OCR diagnostic information:', diagnosis);
       
-      throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}.
+        The text may not be readable or the OCR engine might have encountered an error.`);
     }
     
     // Calculate confidence (approximate since tesseract-wasm doesn't provide direct confidence)
@@ -151,8 +218,33 @@ export const performOCR = async (
       }
     }
     
-    // Provide more detailed error information
+    // Provide more detailed error information based on available diagnostics
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    throw new Error(`Failed to process document with OCR: ${errorMessage}. The browser may not support WASM or the OCR engine files may not be accessible.`);
+    
+    // Run diagnostic to provide more helpful information
+    try {
+      const diagnosis = await diagnoseOCRIssues();
+      console.error('OCR diagnostic information:', diagnosis);
+      
+      // Construct a more helpful error message
+      let enhancedMessage = `Failed to process document with OCR: ${errorMessage}`;
+      
+      if (diagnosis.wasmSupported === false) {
+        enhancedMessage += ' Your browser does not support WebAssembly, which is required for OCR.';
+      }
+      
+      if (diagnosis.corsIssues) {
+        enhancedMessage += ' CORS issues detected - the application may not have permission to access the required files.';
+      }
+      
+      if (diagnosis.suggestions.length > 0) {
+        enhancedMessage += ` Suggestions: ${diagnosis.suggestions[0]}`;
+      }
+      
+      throw new Error(enhancedMessage);
+    } catch (diagError) {
+      // If diagnostics fail, fall back to the original error
+      throw new Error(`Failed to process document with OCR: ${errorMessage}. Additional diagnostics failed.`);
+    }
   }
 };

@@ -11,6 +11,24 @@ export const TESSERACT_CONFIG = {
     workerPath: "/tesseract-worker.js",
     corePath: "/tesseract-core.wasm",
     trainingDataPath: "/eng.traineddata",
+  },
+  // Additional fallbacks at different directory levels
+  additionalFallbacks: {
+    workerPath: [
+      "/assets/tessdata/tesseract-worker.js",
+      "/public/tessdata/tesseract-worker.js",
+      "/static/tessdata/tesseract-worker.js"
+    ],
+    corePath: [
+      "/assets/tessdata/tesseract-core.wasm",
+      "/public/tessdata/tesseract-core.wasm", 
+      "/static/tessdata/tesseract-core.wasm"
+    ],
+    trainingDataPath: [
+      "/assets/tessdata/eng.traineddata",
+      "/public/tessdata/eng.traineddata",
+      "/static/tessdata/eng.traineddata"
+    ]
   }
 };
 
@@ -24,6 +42,25 @@ export const checkFileExists = async (url: string): Promise<boolean> => {
     console.error(`Failed to check if file exists at ${url}:`, error);
     return false;
   }
+};
+
+// Try multiple paths to find a working file
+export const tryMultiplePaths = async (paths: string[]): Promise<{
+  exists: boolean;
+  path: string;
+}> => {
+  for (const path of paths) {
+    try {
+      const exists = await checkFileExists(path);
+      if (exists) {
+        console.log(`File found at path: ${path}`);
+        return { exists: true, path };
+      }
+    } catch (error) {
+      console.error(`Error checking path ${path}:`, error);
+    }
+  }
+  return { exists: false, path: paths[0] };
 };
 
 // Enhanced file check with fallback paths
@@ -46,8 +83,20 @@ export const checkFileWithFallback = async (primaryPath: string, fallbackPath: s
     return { exists: true, path: fallbackPath };
   }
   
-  // Neither path worked
-  console.error(`File not found at either primary or fallback path`);
+  // Neither path worked, try additional fallbacks
+  const fileType = primaryPath.includes('worker') ? 'workerPath' : 
+                   primaryPath.includes('core') ? 'corePath' : 'trainingDataPath';
+                   
+  const additionalPaths = TESSERACT_CONFIG.additionalFallbacks[fileType as keyof typeof TESSERACT_CONFIG.additionalFallbacks] || [];
+  console.log(`Trying additional fallback paths for ${fileType}`);
+  
+  const additionalResult = await tryMultiplePaths(additionalPaths);
+  if (additionalResult.exists) {
+    return additionalResult;
+  }
+  
+  // All fallbacks failed
+  console.error(`File not found at any location`);
   return { exists: false, path: primaryPath };
 };
 
@@ -127,7 +176,7 @@ export const verifyOCRFiles = async (): Promise<{
   };
 };
 
-// Initialize OCR client with configuration
+// Initialize OCR client with configuration and better error handling
 export const createOCRClient = async (
   options: {
     logger?: (message: any) => void;
@@ -156,19 +205,51 @@ export const createOCRClient = async (
     
     // Wrap OCR client creation in a timeout to catch initialization issues
     const client = await Promise.race([
-      new Promise<OCRClient>((resolve) => {
-        const newClient = new OCRClient(config);
-        resolve(newClient);
+      new Promise<OCRClient>((resolve, reject) => {
+        try {
+          const newClient = new OCRClient(config);
+          resolve(newClient);
+        } catch (error) {
+          reject(error);
+        }
       }),
       new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('OCR client initialization timed out after 20 seconds')), 20000)
       )
     ]) as OCRClient;
     
+    // Additional runtime checks to catch common issues
+    if (!client) {
+      throw new Error('OCR client was not properly initialized');
+    }
+    
     const trainingDataPath = verificationResult.workingPaths?.trainingDataPath || TESSERACT_CONFIG.trainingDataPath;
     console.log('Loading OCR model from:', trainingDataPath);
-    await client.loadModel(trainingDataPath);
-    console.log('OCR model loaded successfully');
+    
+    try {
+      await client.loadModel(trainingDataPath);
+      console.log('OCR model loaded successfully');
+    } catch (modelError) {
+      // Attempt to load from fallback paths if primary fails
+      console.error('Failed to load OCR model from primary path:', modelError);
+      
+      let modelLoaded = false;
+      for (const fallbackPath of TESSERACT_CONFIG.additionalFallbacks.trainingDataPath) {
+        try {
+          console.log(`Trying fallback training data path: ${fallbackPath}`);
+          await client.loadModel(fallbackPath);
+          console.log(`OCR model loaded successfully from fallback path: ${fallbackPath}`);
+          modelLoaded = true;
+          break;
+        } catch (fallbackError) {
+          console.error(`Failed to load OCR model from fallback path ${fallbackPath}:`, fallbackError);
+        }
+      }
+      
+      if (!modelLoaded) {
+        throw new Error(`Failed to load OCR model from any path: ${modelError}`);
+      }
+    }
     
     return client;
   } catch (error) {
