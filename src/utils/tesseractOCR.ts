@@ -3,10 +3,18 @@ import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
 
+// Custom OCR options
+interface OCROptions {
+  corePath?: string;
+  workerPath?: string;
+  trainingDataPath?: string;
+}
+
 // Extract text from image using tesseract-wasm
 export const performOCR = async (
   file: File | Blob,
-  progressCallback?: (progress: number) => void
+  progressCallback?: (progress: number) => void,
+  options?: OCROptions
 ): Promise<OCRResult> => {
   let ocrClient: OCRClient | null = null;
   
@@ -14,12 +22,13 @@ export const performOCR = async (
     console.log('Starting OCR processing...');
     
     // Initialize OCR client
-    console.log('Creating OCR client...');
+    console.log('Creating OCR client with options:', options || 'default');
     ocrClient = await createOCRClient({
       progressCallback,
       logger: (message) => {
         console.log('Tesseract progress:', message);
-      }
+      },
+      ...options
     });
     console.log('OCR client created successfully');
     
@@ -55,6 +64,19 @@ export const performOCR = async (
     };
   } catch (error) {
     console.error('OCR processing error:', error);
+    
+    // Try to get more specific error information
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Look for common WebAssembly errors
+    if (errorMessage.includes('Aborted') && errorMessage.includes('expected magic word')) {
+      errorMessage = 'Invalid WebAssembly file. The OCR engine file is corrupted or missing. Try refreshing the page or using the Auto-Fix feature.';
+    } else if (errorMessage.includes('memory access out of bounds')) {
+      errorMessage = 'WebAssembly memory error. The image may be too large or complex for the OCR engine.';
+    } else if (errorMessage.includes('Could not download') || errorMessage.includes('Failed to fetch')) {
+      errorMessage = 'Network error while loading OCR assets. Check your internet connection and try again.';
+    }
+    
     // Clean up resources if there was an error
     if (ocrClient) {
       try {
@@ -64,6 +86,6 @@ export const performOCR = async (
       }
     }
     
-    throw new Error(`Failed to process document with OCR: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Failed to process document with OCR: ${errorMessage}`);
   }
 };
