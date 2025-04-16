@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { performOCR } from '@/utils/tesseractOCR';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, FileUp, FileText, CheckCircle2, X } from "lucide-react";
+import { Loader2, FileUp, FileText, CheckCircle2, X, AlertTriangle } from "lucide-react";
+import { verifyOCRFiles, TESSERACT_CONFIG } from '@/utils/tesseractConfig';
 
 const OCRTest: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -12,6 +13,31 @@ const OCRTest: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<{ 
+    success: boolean; 
+    message: string; 
+    missingFiles: string[] 
+  } | null>(null);
+
+  useEffect(() => {
+    // Verify OCR files on component mount
+    const checkAssets = async () => {
+      try {
+        console.log('Checking OCR assets availability...');
+        const status = await verifyOCRFiles();
+        setVerificationStatus(status);
+      } catch (error) {
+        console.error('Error verifying OCR assets:', error);
+        setVerificationStatus({
+          success: false,
+          message: `Error checking assets: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          missingFiles: []
+        });
+      }
+    };
+    
+    checkAssets();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -56,6 +82,28 @@ const OCRTest: React.FC = () => {
         <CardTitle className="text-center">OCR Test</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Display asset verification status */}
+        {verificationStatus && (
+          <div className={`border p-3 rounded-md mb-4 ${verificationStatus.success ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-center">
+              {verificationStatus.success ? (
+                <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-amber-500 mr-2" />
+              )}
+              <span className="font-medium">{verificationStatus.success ? 'OCR Assets Ready' : 'OCR Asset Warning'}</span>
+            </div>
+            <p className="text-sm mt-1">{verificationStatus.message}</p>
+            
+            {/* Path info */}
+            <div className="mt-2 text-xs text-gray-500">
+              <div>Worker Path: {TESSERACT_CONFIG.workerPath}</div>
+              <div>WASM Path: {TESSERACT_CONFIG.corePath}</div>
+              <div>Training Data: {TESSERACT_CONFIG.trainingDataPath}</div>
+            </div>
+          </div>
+        )}
+        
         {!file ? (
           <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
             <FileUp className="h-12 w-12 text-muted-foreground mb-4" />

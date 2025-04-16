@@ -102,6 +102,39 @@ export const createOCRClient = async (
       console.warn('Attempting to proceed anyway...');
     }
     
+    // Test if the WASM file can be fetched and is valid
+    try {
+      console.log('Testing WASM file validity...');
+      const wasmResponse = await fetch(TESSERACT_CONFIG.corePath);
+      
+      if (!wasmResponse.ok) {
+        console.error(`Failed to fetch WASM file: ${wasmResponse.status} ${wasmResponse.statusText}`);
+        // Try fallback path
+        const fallbackResponse = await fetch(TESSERACT_CONFIG.fallbackPaths.corePath);
+        if (!fallbackResponse.ok) {
+          throw new Error(`WASM file not found at primary or fallback locations`);
+        }
+        // If fallback works, use fallback paths
+        console.log('Using fallback paths for OCR files');
+        TESSERACT_CONFIG.corePath = TESSERACT_CONFIG.fallbackPaths.corePath;
+        TESSERACT_CONFIG.workerPath = TESSERACT_CONFIG.fallbackPaths.workerPath;
+        TESSERACT_CONFIG.trainingDataPath = TESSERACT_CONFIG.fallbackPaths.trainingDataPath;
+      }
+      
+      // Check for magic bytes (WebAssembly header)
+      const buffer = await wasmResponse.arrayBuffer();
+      const bytes = new Uint8Array(buffer.slice(0, 4));
+      // WebAssembly magic bytes: 0x00, 0x61, 0x73, 0x6D
+      if (!(bytes[0] === 0x00 && bytes[1] === 0x61 && bytes[2] === 0x73 && bytes[3] === 0x6D)) {
+        console.error('Invalid WASM file - magic bytes not found:', bytes);
+        throw new Error('The WASM file does not have the correct WebAssembly format');
+      }
+      
+      console.log('WASM file validation successful');
+    } catch (validationError) {
+      console.error('WASM validation error:', validationError);
+    }
+    
     // Initialize OCR client with simplified configuration
     const config = {
       workerPath: TESSERACT_CONFIG.workerPath,

@@ -50,6 +50,28 @@ function downloadFile(url, dest) {
   });
 }
 
+// Check if a WASM file is valid
+function isValidWasmFile(filePath) {
+  try {
+    // Check file exists
+    if (!fs.existsSync(filePath)) {
+      return false;
+    }
+    
+    // Read the first 4 bytes and check for WebAssembly magic bytes
+    const buffer = fs.readFileSync(filePath, { encoding: null, flag: 'r' });
+    // WebAssembly magic bytes: 0x00, 0x61, 0x73, 0x6D
+    return buffer.length >= 4 && 
+           buffer[0] === 0x00 && 
+           buffer[1] === 0x61 && 
+           buffer[2] === 0x73 && 
+           buffer[3] === 0x6D;
+  } catch (error) {
+    console.error(`Error checking WASM file ${filePath}:`, error);
+    return false;
+  }
+}
+
 // Perform downloads
 async function downloadFiles() {
   for (const [filename, url] of Object.entries(fileUrls)) {
@@ -59,6 +81,28 @@ async function downloadFiles() {
       await downloadFile(url, destPath);
       const stats = fs.statSync(destPath);
       console.log(`File ${filename} size: ${(stats.size / 1024).toFixed(2)} KB`);
+      
+      // Verify WASM file if applicable
+      if (filename.endsWith('.wasm')) {
+        const isValid = isValidWasmFile(destPath);
+        if (!isValid) {
+          console.error(`❌ ${filename} is not a valid WebAssembly file!`);
+          console.log(`Deleting invalid file and trying alternative source...`);
+          fs.unlinkSync(destPath);
+          
+          // Try an alternative source
+          const altUrl = 'https://github.com/zliide/tesseract-wasm/raw/master/dist/tesseract-core.wasm';
+          console.log(`Downloading from alternative source: ${altUrl}`);
+          await downloadFile(altUrl, destPath);
+          
+          const isValidNow = isValidWasmFile(destPath);
+          if (!isValidNow) {
+            console.error(`❌ Still not a valid WebAssembly file from alternative source!`);
+          } else {
+            console.log(`✅ Successfully downloaded valid WebAssembly file from alternative source!`);
+          }
+        }
+      }
     } catch (error) {
       console.error(`Error downloading ${filename}:`, error.message);
     }
