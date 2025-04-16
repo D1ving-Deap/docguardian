@@ -2,6 +2,7 @@
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
+import { createWasmBlobUrl } from './directWasmDownloader';
 
 // Custom OCR options
 interface OCROptions {
@@ -20,6 +21,13 @@ export const performOCR = async (
   
   try {
     console.log('Starting OCR processing...');
+    
+    // Check for cached WASM file from direct download
+    const cachedWasmBlob = createWasmBlobUrl();
+    if (cachedWasmBlob && !options?.corePath) {
+      console.log('Using cached WASM blob URL for OCR:', cachedWasmBlob);
+      options = { ...options, corePath: cachedWasmBlob };
+    }
     
     // Initialize OCR client
     console.log('Creating OCR client with options:', options || 'default');

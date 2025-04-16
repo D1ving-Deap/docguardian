@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { performOCR } from '@/utils/tesseractOCR';
 import { Progress } from "@/components/ui/progress";
-import { Loader2, FileUp, FileText, CheckCircle2, X, AlertTriangle, RefreshCw } from "lucide-react";
+import { Loader2, FileUp, FileText, CheckCircle2, X, AlertTriangle, RefreshCw, Download } from "lucide-react";
 import { TESSERACT_CONFIG } from '@/utils/tesseractConfig';
 import { verifyOCRAssets, fixOCRAssetIssues } from '@/utils/ocrAssetVerifier';
+import { downloadWasmFile, createWasmBlobUrl } from '@/utils/directWasmDownloader';
 import { toast } from "@/hooks/use-toast";
 
 const OCRTest: React.FC = () => {
@@ -19,12 +20,38 @@ const OCRTest: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(true);
   const [isFixing, setIsFixing] = useState(false);
   const [fixResult, setFixResult] = useState<any>(null);
+  const [directDownloadAttempted, setDirectDownloadAttempted] = useState(false);
 
   useEffect(() => {
     const checkAssets = async () => {
       try {
         setIsVerifying(true);
         console.log('Checking OCR assets availability...');
+        
+        // Check if we already have a cached WASM file from a previous direct download
+        const cachedWasmBlob = createWasmBlobUrl();
+        if (cachedWasmBlob) {
+          console.log('Using cached WASM blob URL:', cachedWasmBlob);
+          sessionStorage.setItem('ocr-wasm-path', cachedWasmBlob);
+          
+          toast({
+            title: "Using cached WASM file",
+            description: "Using previously downloaded WASM file from session cache",
+            variant: "default"
+          });
+          
+          setVerificationResult({
+            success: true,
+            details: {
+              suggestions: ["Using cached WASM file from browser session"],
+              browserInfo: { userAgent: navigator.userAgent }
+            }
+          });
+          setIsVerifying(false);
+          return;
+        }
+        
+        // If no cached file, verify normal assets
         const result = await verifyOCRAssets();
         setVerificationResult(result);
         
@@ -70,26 +97,115 @@ const OCRTest: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      // Use custom path from session storage if available
-      const customWasmPath = sessionStorage.getItem('ocr-wasm-path');
+      // Check for cached WASM blob URL first
+      let wasmOptions: any = {};
+      const cachedWasmBlob = createWasmBlobUrl();
+      
+      if (cachedWasmBlob) {
+        console.log('Using cached WASM blob URL:', cachedWasmBlob);
+        wasmOptions.corePath = cachedWasmBlob;
+      } else {
+        // Use custom path from session storage if available
+        const customWasmPath = sessionStorage.getItem('ocr-wasm-path');
+        if (customWasmPath) {
+          wasmOptions.corePath = customWasmPath;
+        }
+      }
       
       const ocrResult = await performOCR(file, (progress) => {
         setProgress(progress * 100);
-      }, customWasmPath ? { corePath: customWasmPath } : undefined);
+      }, wasmOptions);
       
       setResult(ocrResult.text);
+      
+      toast({
+        title: "OCR Processing Complete",
+        description: "Text successfully extracted from image",
+        variant: "default"
+      });
     } catch (error) {
       console.error('OCR processing error:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Unknown error occurred');
       
-      // Show toast with error
-      toast({
-        title: "OCR Processing Failed",
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: "destructive"
-      });
+      // Automatically try direct download if we haven't yet and there's a WASM-related error
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMsg.includes('WebAssembly') && !directDownloadAttempted) {
+        await tryDirectDownload();
+      } else {
+        // Show toast with error
+        toast({
+          title: "OCR Processing Failed",
+          description: errorMsg,
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsProcessing(false);
+    }
+  };
+  
+  const tryDirectDownload = async () => {
+    setDirectDownloadAttempted(true);
+    setIsFixing(true);
+    
+    toast({
+      title: "Attempting Direct Download",
+      description: "Downloading WebAssembly files directly from CDN...",
+      variant: "default"
+    });
+    
+    try {
+      const success = await downloadWasmFile('tesseract-core.wasm');
+      
+      if (success) {
+        // Create blob URL from the cached WASM binary
+        const blobUrl = createWasmBlobUrl();
+        if (blobUrl) {
+          sessionStorage.setItem('ocr-wasm-path', blobUrl);
+          
+          toast({
+            title: "Direct Download Successful",
+            description: "WebAssembly files downloaded. Try processing your image now.",
+            variant: "default"
+          });
+          
+          setVerificationResult({
+            success: true,
+            details: {
+              suggestions: ["Using directly downloaded WASM file"],
+              browserInfo: { userAgent: navigator.userAgent }
+            }
+          });
+          
+          // Auto-process the image again if we have one
+          if (file) {
+            processImage();
+          }
+          
+          return true;
+        }
+      }
+      
+      toast({
+        title: "Direct Download Failed",
+        description: "Could not download WebAssembly files. Try a different browser.",
+        variant: "destructive"
+      });
+      
+      return false;
+    } catch (error) {
+      console.error('Direct download error:', error);
+      
+      toast({
+        title: "Direct Download Error",
+        description: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+      
+      return false;
+    } finally {
+      setIsFixing(false);
     }
   };
 
@@ -134,14 +250,40 @@ const OCRTest: React.FC = () => {
   const runAutoFix = async () => {
     setIsFixing(true);
     try {
+      // First try the standard auto-fix
       const result = await fixOCRAssetIssues();
       setFixResult(result);
       
-      toast({
-        title: result.success ? "Auto-Fix Successful" : "Auto-Fix Issues",
-        description: result.message,
-        variant: result.success ? "default" : "destructive"
-      });
+      // If standard auto-fix was not successful, try direct download
+      if (!result.success) {
+        toast({
+          title: "Trying Direct Download",
+          description: "Standard fix unsuccessful, attempting direct download...",
+          variant: "default"
+        });
+        
+        const directSuccess = await tryDirectDownload();
+        
+        if (directSuccess) {
+          setFixResult({
+            success: true,
+            message: "Successfully downloaded WASM file directly from CDN",
+            fixesApplied: ["Direct download of WebAssembly file"]
+          });
+        } else {
+          toast({
+            title: "Auto-Fix Failed",
+            description: "Could not fix issues. Please try in a different browser.",
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: result.success ? "Auto-Fix Successful" : "Auto-Fix Issues",
+          description: result.message,
+          variant: result.success ? "default" : "destructive"
+        });
+      }
       
       // Re-run verification after fixing
       await runVerification();
@@ -174,7 +316,7 @@ const OCRTest: React.FC = () => {
               <span className="font-medium">{verificationResult.success ? 'OCR Assets Ready' : 'OCR Asset Warning'}</span>
             </div>
             
-            {!verificationResult.success && verificationResult.details.suggestions.length > 0 && (
+            {!verificationResult.success && verificationResult.details?.suggestions?.length > 0 && (
               <div className="mt-2 text-sm">
                 <p className="font-medium">Suggestions:</p>
                 <ul className="list-disc pl-5 space-y-1">
@@ -206,17 +348,35 @@ const OCRTest: React.FC = () => {
                 <RefreshCw className={`h-4 w-4 mr-1 ${isFixing ? 'animate-spin' : ''}`} />
                 {isFixing ? 'Fixing...' : 'Auto-Fix Issues'}
               </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={tryDirectDownload}
+                disabled={isFixing || isVerifying}
+                className="flex-1"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Direct Download
+              </Button>
             </div>
             
             <div className="mt-3 text-xs border-t pt-2 text-gray-500">
-              <p>Current Paths:</p>
-              <div>Worker: {TESSERACT_CONFIG.workerPath}</div>
-              <div>WASM: {TESSERACT_CONFIG.corePath}</div>
-              <div>Training: {TESSERACT_CONFIG.trainingDataPath}</div>
-              {sessionStorage.getItem('ocr-wasm-path') && (
+              <p>Current Configuration:</p>
+              {sessionStorage.getItem('ocr-wasm-path') ? (
                 <div className="mt-1 text-green-600">
                   Using custom WASM path: {sessionStorage.getItem('ocr-wasm-path')}
                 </div>
+              ) : cachedWasmBlob ? (
+                <div className="mt-1 text-green-600">
+                  Using WASM from browser cache (downloaded from {sessionStorage.getItem('ocr-wasm-source') || 'unknown source'})
+                </div>
+              ) : (
+                <>
+                  <div>Worker: {TESSERACT_CONFIG.workerPath}</div>
+                  <div>WASM: {TESSERACT_CONFIG.corePath}</div>
+                  <div>Training: {TESSERACT_CONFIG.trainingDataPath}</div>
+                </>
               )}
             </div>
           </div>
@@ -240,7 +400,6 @@ const OCRTest: React.FC = () => {
                 variant="outline" 
                 className="cursor-pointer" 
                 asChild
-                disabled={isVerifying || (!verificationResult?.success && !sessionStorage.getItem('ocr-wasm-path'))}
               >
                 <span>Select Image</span>
               </Button>
@@ -294,11 +453,11 @@ const OCRTest: React.FC = () => {
                 </div>
                 <div className="flex space-x-2">
                   <Button onClick={processImage} className="flex-1">Try Again</Button>
-                  <Button onClick={reset} variant="outline" className="flex-1">Reset</Button>
-                  <Button onClick={runAutoFix} variant="outline" className="flex-1">
-                    <RefreshCw className={`h-4 w-4 mr-1 ${isFixing ? 'animate-spin' : ''}`} />
-                    Fix Issues
+                  <Button onClick={tryDirectDownload} variant="outline" className="flex-1">
+                    <Download className="h-4 w-4 mr-1" />
+                    Direct Download
                   </Button>
+                  <Button onClick={reset} variant="outline" className="flex-1">Reset</Button>
                 </div>
               </div>
             ) : (
