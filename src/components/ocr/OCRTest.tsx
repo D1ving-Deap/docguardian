@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,14 +17,45 @@ const OCRTest: React.FC = () => {
     message: string; 
     missingFiles: string[] 
   } | null>(null);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+  const [isValidatingFiles, setIsValidatingFiles] = useState(false);
 
   useEffect(() => {
-    // Verify OCR files on component mount
     const checkAssets = async () => {
       try {
+        setIsValidatingFiles(true);
         console.log('Checking OCR assets availability...');
         const status = await verifyOCRFiles();
         setVerificationStatus(status);
+        
+        if (status.success) {
+          try {
+            const isValid = await validateWasmFile(TESSERACT_CONFIG.corePath);
+            if (!isValid) {
+              setVerificationStatus({
+                success: false,
+                message: 'WASM file has invalid format. Please run the copy-tesseract-files.js script.',
+                missingFiles: ['Core WASM (Invalid format)']
+              });
+            }
+          } catch (wasmError) {
+            console.error('Error validating WASM file:', wasmError);
+          }
+        }
+        
+        const browserInfo = {
+          userAgent: navigator.userAgent,
+          wasmSupported: typeof WebAssembly === 'object',
+          isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+          browser: navigator.userAgent.indexOf('Chrome') > -1 ? 'Chrome' : 
+                  navigator.userAgent.indexOf('Firefox') > -1 ? 'Firefox' :
+                  navigator.userAgent.indexOf('Safari') > -1 ? 'Safari' :
+                  navigator.userAgent.indexOf('Edge') > -1 ? 'Edge' : 'Unknown',
+          url: window.location.href,
+          protocol: window.location.protocol
+        };
+        
+        setDiagnosticInfo(browserInfo);
       } catch (error) {
         console.error('Error verifying OCR assets:', error);
         setVerificationStatus({
@@ -33,6 +63,8 @@ const OCRTest: React.FC = () => {
           message: `Error checking assets: ${error instanceof Error ? error.message : 'Unknown error'}`,
           missingFiles: []
         });
+      } finally {
+        setIsValidatingFiles(false);
       }
     };
     
@@ -76,13 +108,67 @@ const OCRTest: React.FC = () => {
     setProgress(0);
   };
 
+  const runFileValidation = async () => {
+    setIsValidatingFiles(true);
+    try {
+      const wasmValid = await validateWasmFile(TESSERACT_CONFIG.corePath);
+      const workerExists = await checkFileExists(TESSERACT_CONFIG.workerPath);
+      const trainingExists = await checkFileExists(TESSERACT_CONFIG.trainingDataPath);
+      
+      const fallbackWasmValid = await validateWasmFile(TESSERACT_CONFIG.fallbackPaths.corePath);
+      const fallbackWorkerExists = await checkFileExists(TESSERACT_CONFIG.fallbackPaths.workerPath);
+      const fallbackTrainingExists = await checkFileExists(TESSERACT_CONFIG.fallbackPaths.trainingDataPath);
+      
+      const validationResults = {
+        primary: {
+          wasm: { exists: wasmValid, path: TESSERACT_CONFIG.corePath },
+          worker: { exists: workerExists, path: TESSERACT_CONFIG.workerPath },
+          training: { exists: trainingExists, path: TESSERACT_CONFIG.trainingDataPath }
+        },
+        fallback: {
+          wasm: { exists: fallbackWasmValid, path: TESSERACT_CONFIG.fallbackPaths.corePath },
+          worker: { exists: fallbackWorkerExists, path: TESSERACT_CONFIG.fallbackPaths.workerPath },
+          training: { exists: fallbackTrainingExists, path: TESSERACT_CONFIG.fallbackPaths.trainingDataPath }
+        }
+      };
+      
+      setDiagnosticInfo({
+        ...diagnosticInfo,
+        validation: validationResults,
+        timestamp: new Date().toISOString()
+      });
+      
+      const newStatus = {
+        success: wasmValid && workerExists && trainingExists,
+        message: wasmValid && workerExists && trainingExists ? 
+          'All OCR files verified successfully' : 
+          'Some OCR files are missing or invalid',
+        missingFiles: []
+      };
+      
+      if (!wasmValid) newStatus.missingFiles.push('Core WASM');
+      if (!workerExists) newStatus.missingFiles.push('Worker JS');
+      if (!trainingExists) newStatus.missingFiles.push('Training Data');
+      
+      setVerificationStatus(newStatus);
+    } catch (error) {
+      console.error('Validation error:', error);
+      setDiagnosticInfo({
+        ...diagnosticInfo,
+        validationError: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setIsValidatingFiles(false);
+    }
+  };
+
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
         <CardTitle className="text-center">OCR Test</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Display asset verification status */}
         {verificationStatus && (
           <div className={`border p-3 rounded-md mb-4 ${verificationStatus.success ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
             <div className="flex items-center">
@@ -95,11 +181,40 @@ const OCRTest: React.FC = () => {
             </div>
             <p className="text-sm mt-1">{verificationStatus.message}</p>
             
-            {/* Path info */}
             <div className="mt-2 text-xs text-gray-500">
               <div>Worker Path: {TESSERACT_CONFIG.workerPath}</div>
               <div>WASM Path: {TESSERACT_CONFIG.corePath}</div>
               <div>Training Data: {TESSERACT_CONFIG.trainingDataPath}</div>
+            </div>
+            
+            <div className="mt-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={runFileValidation}
+                disabled={isValidatingFiles}
+              >
+                {isValidatingFiles ? 'Validating...' : 'Validate Files'}
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {diagnosticInfo && (
+          <div className="border p-3 rounded-md mb-4 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">Diagnostic Information</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setDiagnosticInfo(null)} 
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="mt-2 text-xs text-gray-600 overflow-auto max-h-40">
+              <pre>{JSON.stringify(diagnosticInfo, null, 2)}</pre>
             </div>
           </div>
         )}
