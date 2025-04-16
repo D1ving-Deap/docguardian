@@ -41,4 +41,11 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // Ensure WASM files are handled correctly
+    assetsInlineLimit: 0, // Don't inline any assets as base64
+  },
+  optimizeDeps: {
+    exclude: ['tesseract-wasm'], // Exclude tesseract-wasm from dependency optimization
+  }
 }));
