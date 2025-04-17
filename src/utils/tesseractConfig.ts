@@ -39,9 +39,11 @@ const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '/tessdata';
 export const TESSERACT_CONFIG: TesseractConfig = {
   workerPath: '/tessdata/tesseract-worker.js',
   corePath: '/tessdata/tesseract-core.wasm',
-  trainingDataPath: 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/eng.traineddata',
+  trainingDataPath: '/tessdata/eng.traineddata',
   fallbackPaths: {
-    trainingDataPath: '/tessdata/eng.traineddata'
+    workerPath: 'https://your-cdn.com/tesseract-worker.js',
+    corePath: 'https://your-cdn.com/tesseract-core.wasm',
+    trainingDataPath: 'https://your-cdn.com/eng.traineddata'
   }
 };
 
