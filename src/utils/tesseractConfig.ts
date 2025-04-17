@@ -34,7 +34,7 @@ interface TesseractConfig {
 }
 
 // Configurable base path for portability
-const BASE_PATH = process.env.TESSERACT_BASE_PATH || '/tessdata';
+const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '/tessdata';
 
 export const TESSERACT_CONFIG: TesseractConfig = {
   workerPath: '/tessdata/tesseract-worker.js',
@@ -124,14 +124,14 @@ const resolveBestPath = async (
 
   const primaryResult = await check(primary, validateWasm);
   if (primaryResult) {
-    validationCache[primary] = { ...primaryResult, label };
+    validationCache[primary] = { success: true, path: primary, label };
     return validationCache[primary];
   }
 
   if (fallback) {
     const fallbackResult = await check(fallback, validateWasm);
     if (fallbackResult) {
-      validationCache[primary] = { ...fallbackResult, label };
+      validationCache[primary] = { success: true, path: fallback, label };
       return validationCache[primary];
     }
   }
