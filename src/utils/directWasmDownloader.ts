@@ -6,13 +6,37 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
   try {
     console.log('Starting direct WASM download process for:', destination);
     
-    // List of reliable sources for tesseract-core.wasm
+    // List of reliable sources for tesseract-core.wasm with base URL support for production
+    const baseUrl = window.location.origin;
+    console.log('Current base URL:', baseUrl);
+    
+    // Get current path segments to correctly handle subdirectories
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const basePath = pathSegments.length > 0 ? `/${pathSegments[0]}` : '';
+    console.log('Base path:', basePath);
+    
+    // Create absolute paths based on current location
+    const absolutePath = (path: string) => {
+      if (path.startsWith('http')) return path;  // Already absolute
+      if (path.startsWith('/')) return `${baseUrl}${path}`;  // Root-relative
+      return `${baseUrl}${basePath ? basePath : ''}/${path}`;  // Document-relative
+    };
+    
     const wasmSources = [
       // Local paths as priority (these will work in production)
-      '/tessdata/tesseract-core.wasm',
-      '/tesseract-core.wasm',
-      '/public/tessdata/tesseract-core.wasm',
-      '/public/tesseract-core.wasm',
+      `${baseUrl}/tessdata/tesseract-core.wasm`,
+      `${baseUrl}${basePath}/tessdata/tesseract-core.wasm`,
+      `${baseUrl}/tesseract-core.wasm`,
+      `${baseUrl}${basePath}/tesseract-core.wasm`,
+      // Asset folder paths
+      `${baseUrl}/assets/tessdata/tesseract-core.wasm`,
+      `${baseUrl}/assets/tesseract-core.wasm`,
+      // Static folder paths for various frameworks
+      `${baseUrl}/static/tessdata/tesseract-core.wasm`,
+      `${baseUrl}/static/tesseract-core.wasm`,
+      // Public folder explicit paths
+      `${baseUrl}/public/tessdata/tesseract-core.wasm`,
+      `${baseUrl}/public/tesseract-core.wasm`,
       // Then try CDN sources
       'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
       'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
@@ -36,10 +60,10 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
     // Try each source until one works
     for (const source of wasmSources) {
       try {
-        console.log(`Downloading from ${source}...`);
+        console.log(`Attempting download from ${source}...`);
         
         // Add a cache-busting parameter to avoid cached responses
-        const url = new URL(source, window.location.origin);
+        const url = new URL(source);
         url.searchParams.append('t', Date.now().toString());
         
         console.log(`Fetching from URL: ${url.toString()}`);
@@ -132,13 +156,29 @@ export const downloadTrainingData = async (): Promise<boolean> => {
   try {
     console.log('Starting training data download...');
     
+    // Get current base URL from the window location
+    const baseUrl = window.location.origin;
+    
+    // Get current path segments to correctly handle subdirectories
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const basePath = pathSegments.length > 0 ? `/${pathSegments[0]}` : '';
+    
     // List of reliable sources for eng.traineddata
     const trainingDataSources = [
       // Local paths as priority (these will work in production)
-      '/tessdata/eng.traineddata',
-      '/eng.traineddata',
-      '/public/tessdata/eng.traineddata',
-      '/public/eng.traineddata',
+      `${baseUrl}/tessdata/eng.traineddata`,
+      `${baseUrl}${basePath}/tessdata/eng.traineddata`,
+      `${baseUrl}/eng.traineddata`,
+      `${baseUrl}${basePath}/eng.traineddata`,
+      // Asset folder paths
+      `${baseUrl}/assets/tessdata/eng.traineddata`,
+      `${baseUrl}/assets/eng.traineddata`,
+      // Static folder paths
+      `${baseUrl}/static/tessdata/eng.traineddata`,
+      `${baseUrl}/static/eng.traineddata`,
+      // Public folder explicit paths
+      `${baseUrl}/public/tessdata/eng.traineddata`,
+      `${baseUrl}/public/eng.traineddata`,
       // CDN sources as fallback
       'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
       'https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata',
@@ -158,7 +198,7 @@ export const downloadTrainingData = async (): Promise<boolean> => {
         console.log(`Trying training data source: ${source}`);
         
         // Add cache busting
-        const url = new URL(source, window.location.origin);
+        const url = new URL(source);
         url.searchParams.append('t', Date.now().toString());
         
         // First use HEAD to check if exists (faster than getting the whole file)
@@ -203,7 +243,11 @@ export const downloadTrainingData = async (): Promise<boolean> => {
     
     // Local fallback as last resort - force use the local path even if we couldn't verify it
     console.warn('Could not verify any training data source, using local fallback');
-    sessionStorage.setItem('ocr-training-data-path', '/tessdata/eng.traineddata');
+    
+    // Store the most likely path based on the current origin
+    const fallbackPath = `${baseUrl}/tessdata/eng.traineddata`;
+    sessionStorage.setItem('ocr-training-data-path', fallbackPath);
+    console.log('Using fallback training data path:', fallbackPath);
     
     return false;
   } catch (error) {

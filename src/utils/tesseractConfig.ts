@@ -19,20 +19,35 @@ interface TesseractConfig {
 const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
 
 /**
+ * Get base URL for the current environment
+ */
+const getBaseUrl = (): string => {
+  // Get current domain
+  const baseUrl = window.location.origin;
+  
+  // Get current path segments to correctly handle subdirectories in deployed apps
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const basePath = pathSegments.length > 0 ? `/${pathSegments[0]}` : '';
+  
+  console.log('Using base URL:', baseUrl, 'with base path:', basePath);
+  return baseUrl + basePath;
+};
+
+/**
  * Default configuration for Tesseract
  * Using multiple potential paths to improve resilience
  */
 export const TESSERACT_CONFIG: TesseractConfig = {
   // Primary paths - CDN or hosted paths
   workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
-  corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-  trainingDataPath: '/tessdata/eng.traineddata', // Changed to local path by default
+  corePath: `${getBaseUrl()}/tessdata/tesseract-core.wasm`, // Try local assets first
+  trainingDataPath: `${getBaseUrl()}/tessdata/eng.traineddata`, // Local path by default
   
-  // Fallback paths - local deployment paths
+  // Fallback paths - local deployment and CDN paths
   fallbackPaths: {
-    workerPath: '/tessdata/tesseract-worker.js',
-    corePath: '/tessdata/tesseract-core.wasm',
-    trainingDataPath: '/tessdata/eng.traineddata',
+    workerPath: `${getBaseUrl()}/tessdata/tesseract-worker.js`,
+    corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+    trainingDataPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
   },
 };
 
@@ -163,24 +178,32 @@ export const resolveBestPath = async (
     }
   }
 
-  // Try additional public paths for traineddata files
-  if (fileType === 'Training Data') {
+  // Try additional paths for deployed environments
+  if (fileType === 'Core WASM' || fileType === 'Training Data') {
+    const baseUrl = window.location.origin;
     const additionalPaths = [
-      '/eng.traineddata',
-      '/public/eng.traineddata',
-      '/public/tessdata/eng.traineddata'
+      // Main variations
+      `${baseUrl}/tessdata/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
+      `${baseUrl}/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
+      // Asset variations
+      `${baseUrl}/assets/tessdata/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
+      `${baseUrl}/assets/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
+      // Static variations
+      `${baseUrl}/static/tessdata/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
+      `${baseUrl}/static/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
     ];
     
     for (const path of additionalPaths) {
-      console.log(`Trying additional training data path: ${path}`);
+      console.log(`Trying additional path: ${path}`);
       if (await checkFileExists(path)) {
-        return { success: true, path };
+        const isValid = fileType === 'Core WASM' ? await validateWasmFile(path) : true;
+        if (isValid) return { success: true, path };
       }
     }
     
     // If we still haven't found it, force use the fallback path even if we couldn't verify it
     if (fallbackPath) {
-      console.warn(`Forcing use of fallback training data path: ${fallbackPath}`);
+      console.warn(`Forcing use of fallback path: ${fallbackPath}`);
       return { success: true, path: fallbackPath };
     }
   }

@@ -43,7 +43,7 @@ const OCRTestPage: React.FC = () => {
           toast({
             title: "Partial Download Success",
             description: "Core files downloaded but training data may be missing. The system will attempt to use fallbacks.",
-            variant: "warning"
+            variant: "destructive"  // Changed from "warning" to "destructive" to match allowed variants
           });
         }
       } else {
