@@ -1,23 +1,34 @@
+
 /**
  * Direct WASM downloader utility to fetch WebAssembly files from trusted sources
  */
 export const downloadWasmFile = async (destination: string): Promise<boolean> => {
   try {
+    console.log('Starting direct WASM download process for:', destination);
+    
     // List of reliable sources for tesseract-core.wasm
     const wasmSources = [
       'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
       'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
       'https://raw.githubusercontent.com/zliide/tesseract-wasm/master/dist/tesseract-core.wasm',
-      'https://cdn.staticaly.com/gh/naptha/tesseract.js/master/dist/worker.min.js',
-      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract-core.wasm'
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract-core.wasm',
+      // Add local paths as fallbacks
+      '/tessdata/tesseract-core.wasm',
+      '/tesseract-core.wasm',
+      '/public/tessdata/tesseract-core.wasm',
+      '/public/tesseract-core.wasm'
     ];
-    
-    console.log('Attempting direct WASM download...');
     
     // Check if the WASM file is already cached
     const cachedFile = sessionStorage.getItem('ocr-wasm-binary');
     if (cachedFile) {
       console.log('WASM file already cached in session storage');
+      return true;
+    }
+    
+    const cachedPath = sessionStorage.getItem('ocr-wasm-path');
+    if (cachedPath && cachedPath.startsWith('blob:')) {
+      console.log('WASM blob URL already cached:', cachedPath);
       return true;
     }
     
@@ -27,13 +38,14 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
         console.log(`Downloading from ${source}...`);
         
         // Add a cache-busting parameter to avoid cached responses
-        const url = new URL(source);
+        const url = new URL(source, window.location.origin);
         url.searchParams.append('t', Date.now().toString());
+        
+        console.log(`Fetching from URL: ${url.toString()}`);
         
         const response = await fetch(url.toString(), { 
           method: 'GET',
           cache: 'no-cache',
-          mode: 'cors',
           credentials: 'omit',
           headers: {
             'Accept': 'application/wasm,*/*'
@@ -48,6 +60,8 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
         // Get the binary data
         const arrayBuffer = await response.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
+        
+        console.log(`Downloaded ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB from ${source}`);
         
         // Verify that this is actually a valid WASM file (check magic bytes)
         if (bytes.length < 4 || 
@@ -70,31 +84,36 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
           continue;
         }
         
-        console.log(`Valid WASM file downloaded from ${source}, size: ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB`);
+        console.log(`✅ Valid WASM file downloaded from ${source}, size: ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB`);
         
-        // Store the valid WASM file in browser cache
-        console.log('Storing WASM file in session storage...');
+        // Create a blob URL for the WASM data
         try {
-          sessionStorage.setItem('ocr-wasm-binary', arrayBufferToBase64(arrayBuffer));
-          sessionStorage.setItem('ocr-wasm-source', source);
-          console.log('WASM file successfully cached in session storage');
-          return true;
-        } catch (storageError) {
-          console.error('Failed to store WASM in session storage:', storageError);
-          // Create a blob URL instead if session storage fails (e.g., due to size limits)
           const blob = new Blob([arrayBuffer], { type: 'application/wasm' });
           const blobUrl = URL.createObjectURL(blob);
           sessionStorage.setItem('ocr-wasm-path', blobUrl);
-          console.log('Created blob URL instead:', blobUrl);
-          return true;
+          sessionStorage.setItem('ocr-wasm-source', source);
+          console.log('Created blob URL for WASM file:', blobUrl);
+        } catch (blobError) {
+          console.error('Failed to create blob URL:', blobError);
         }
+        
+        // Also try to store the binary data for redundancy
+        try {
+          sessionStorage.setItem('ocr-wasm-binary', arrayBufferToBase64(arrayBuffer));
+          console.log('WASM binary data cached in session storage');
+        } catch (storageError) {
+          console.warn('Could not store WASM binary in session storage (likely too large):', storageError);
+          // We already created the blob URL above, so this is just a warning
+        }
+        
+        return true;
       } catch (err) {
         console.error(`Error downloading from ${source}:`, err);
       }
     }
     
     // All sources failed
-    console.error('All WASM download sources failed');
+    console.error('⚠️ All WASM download sources failed');
     return false;
   } catch (error) {
     console.error('Direct WASM download failed:', error);

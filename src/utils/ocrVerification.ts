@@ -1,3 +1,4 @@
+
 import { TESSERACT_CONFIG, checkFileExists, checkFileWithFallback, validateWasmFile } from './tesseractConfig';
 
 /**
@@ -41,21 +42,38 @@ export const verifyOCRAssets = async (): Promise<{
     };
   }
   
+  // Check for cached WASM blob first - this is the most reliable source
+  const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+  if (cachedWasmPath && cachedWasmPath.startsWith('blob:')) {
+    console.log('Using cached WASM blob URL:', cachedWasmPath);
+    return {
+      success: true,
+      missingFiles: [],
+      message: 'Using cached WASM file from browser session',
+      workingPaths: {
+        workerPath: TESSERACT_CONFIG.workerPath,
+        corePath: cachedWasmPath,
+        trainingDataPath: TESSERACT_CONFIG.trainingDataPath
+      },
+      browserInfo
+    };
+  }
+  
   const filesToCheck = [
     { 
       name: 'Worker JS', 
       primaryPath: TESSERACT_CONFIG.workerPath, 
-      fallbackPath: TESSERACT_CONFIG.fallbackPaths.workerPath 
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.workerPath 
     },
     { 
       name: 'Core WASM', 
       primaryPath: TESSERACT_CONFIG.corePath, 
-      fallbackPath: TESSERACT_CONFIG.fallbackPaths.corePath 
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.corePath 
     },
     { 
       name: 'Training Data', 
       primaryPath: TESSERACT_CONFIG.trainingDataPath, 
-      fallbackPath: TESSERACT_CONFIG.fallbackPaths.trainingDataPath 
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.trainingDataPath 
     }
   ];
   
@@ -117,6 +135,10 @@ export const verifyOCRAssets = async (): Promise<{
  * Handles verification errors by providing user-friendly messages
  */
 export const getVerificationErrorMessage = (missingFiles: string[]): string => {
+  if (!missingFiles || missingFiles.length === 0) {
+    return "Unknown verification error";
+  }
+  
   if (missingFiles.includes('Worker JS') && missingFiles.includes('Core WASM')) {
     return "Tesseract OCR engine files are missing. Please ensure the application is properly installed.";
   } 
