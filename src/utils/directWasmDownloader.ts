@@ -8,15 +8,16 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
     
     // List of reliable sources for tesseract-core.wasm
     const wasmSources = [
-      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      'https://raw.githubusercontent.com/zliide/tesseract-wasm/master/dist/tesseract-core.wasm',
-      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract-core.wasm',
-      // Add local paths as fallbacks
+      // Local paths as priority (these will work in production)
       '/tessdata/tesseract-core.wasm',
       '/tesseract-core.wasm',
       '/public/tessdata/tesseract-core.wasm',
-      '/public/tesseract-core.wasm'
+      '/public/tesseract-core.wasm',
+      // Then try CDN sources
+      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+      'https://raw.githubusercontent.com/zliide/tesseract-wasm/master/dist/tesseract-core.wasm',
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract-core.wasm'
     ];
     
     // Check if the WASM file is already cached
@@ -106,6 +107,9 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
           // We already created the blob URL above, so this is just a warning
         }
         
+        // Now that we have WASM, also download training data
+        await downloadTrainingData();
+        
         return true;
       } catch (err) {
         console.error(`Error downloading from ${source}:`, err);
@@ -130,14 +134,15 @@ export const downloadTrainingData = async (): Promise<boolean> => {
     
     // List of reliable sources for eng.traineddata
     const trainingDataSources = [
-      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
-      'https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata',
-      'https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata',
-      // Local fallbacks
+      // Local paths as priority (these will work in production)
       '/tessdata/eng.traineddata',
       '/eng.traineddata',
       '/public/tessdata/eng.traineddata',
-      '/public/eng.traineddata'
+      '/public/eng.traineddata',
+      // CDN sources as fallback
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+      'https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata',
+      'https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata'
     ];
     
     // Check if already cached
@@ -156,21 +161,41 @@ export const downloadTrainingData = async (): Promise<boolean> => {
         const url = new URL(source, window.location.origin);
         url.searchParams.append('t', Date.now().toString());
         
-        const response = await fetch(url.toString(), { 
+        // First use HEAD to check if exists (faster than getting the whole file)
+        const headResponse = await fetch(url.toString(), { 
           method: 'HEAD',
           cache: 'no-store'
         });
         
-        if (!response.ok) {
-          console.warn(`Training data not available at ${source}: ${response.status}`);
+        if (!headResponse.ok) {
+          console.warn(`Training data not available at ${source}: ${headResponse.status}`);
           continue;
         }
         
-        console.log(`✅ Found valid training data at ${source}`);
-        
-        // Store the successful path
-        sessionStorage.setItem('ocr-training-data-path', source);
-        return true;
+        // Try to actually download a small part to verify it's accessible
+        try {
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+              'Range': 'bytes=0-1023' // Only get first KB to check if it's valid
+            }
+          });
+          
+          if (!response.ok) {
+            console.warn(`Failed to download training data from ${source}: ${response.status}`);
+            continue;
+          }
+          
+          const buffer = await response.arrayBuffer();
+          if (buffer.byteLength > 0) {
+            console.log(`✅ Found valid training data at ${source} (verified ${buffer.byteLength} bytes)`);
+            sessionStorage.setItem('ocr-training-data-path', source);
+            return true;
+          }
+        } catch (downloadError) {
+          console.warn(`Error verifying training data at ${source}:`, downloadError);
+          continue;
+        }
       } catch (err) {
         console.error(`Error checking training data at ${source}:`, err);
       }
