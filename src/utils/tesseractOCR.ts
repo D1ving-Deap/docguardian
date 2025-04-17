@@ -1,5 +1,4 @@
 
-// src/utils/tesseractOCR.ts
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
@@ -23,8 +22,10 @@ export const performOCR = async (
     ? { progressCallback: options } 
     : options;
 
+  // Ensure logger is always a function, defaulting to console.log
+  const logger = normalizedOptions.logger || console.log;
+
   try {
-    const logger = normalizedOptions.logger || console.log;
     logger('🔍 Starting OCR processing...');
 
     // Step 1: Initialize OCR client with blob-based worker
@@ -35,7 +36,8 @@ export const performOCR = async (
     const cachedTrainingDataPath = sessionStorage.getItem('ocr-training-data-path');
     
     const clientOptions: OCROptions = {
-      ...normalizedOptions
+      ...normalizedOptions,
+      logger  // Pass the logger to client options
     };
     
     if (cachedWasmPath) {
