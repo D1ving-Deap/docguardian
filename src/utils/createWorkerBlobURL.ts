@@ -40,14 +40,13 @@ export const createWorkerBlobURL = async (scriptPath: string): Promise<string> =
     // Create blob URL from the patched script
     const blob = new Blob([patched], { type: 'application/javascript' });
     const blobURL = URL.createObjectURL(blob);
-    console.log(`Created worker blob URL: ${blobURL}`);
+    console.log(`Created fresh worker blob URL: ${blobURL}`);
     
-    // Cache the blob URL in session storage for potential reuse
+    // Store the source path for debugging, but not the blob URL
     try {
-      sessionStorage.setItem('ocr-worker-blob-url', blobURL);
       sessionStorage.setItem('ocr-worker-source', scriptPath);
     } catch (storageError) {
-      console.warn('Failed to cache worker blob URL in session storage:', storageError);
+      console.warn('Failed to store worker source in session storage:', storageError);
     }
     
     return blobURL;
@@ -57,13 +56,5 @@ export const createWorkerBlobURL = async (scriptPath: string): Promise<string> =
   }
 };
 
-/**
- * Gets a cached worker blob URL if available, or returns null
- */
-export const getCachedWorkerBlobURL = (): string | null => {
-  try {
-    return sessionStorage.getItem('ocr-worker-blob-url');
-  } catch {
-    return null;
-  }
-};
+// Note: getCachedWorkerBlobURL is removed since we always want fresh blobs
+
