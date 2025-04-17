@@ -26,6 +26,7 @@ export const performOCR = async (
     const isOnDashboardRoute = window.location.pathname.includes('/dashboard');
     if (isOnDashboardRoute && !options) {
       console.log('Detected dashboard route, using CDN paths');
+      // Always use unpkg CDN for dashboard routes to avoid path resolution issues
       options = {
         corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
         workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',

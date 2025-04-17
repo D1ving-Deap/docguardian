@@ -1,3 +1,4 @@
+
 /**
  * Direct WASM downloader utility to fetch WebAssembly files from trusted sources
  */
@@ -11,7 +12,7 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
     console.log('Base URL:', baseUrl);
     console.log('Path:', window.location.pathname);
     
-    // Check if we're on a subroute in production
+    // Check if we're on a subroute in production (especially dashboard)
     const isOnSubroute = window.location.pathname.includes('/dashboard') || 
                         window.location.pathname.includes('/login');
     

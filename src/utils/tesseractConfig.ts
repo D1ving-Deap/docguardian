@@ -15,7 +15,7 @@ interface TesseractConfig {
 }
 
 // WASM file magic bytes constant (WebAssembly binary format identifier)
-const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
+const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6d]);
 
 /**
  * Get base URL for the current environment
