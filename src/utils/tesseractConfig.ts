@@ -4,15 +4,27 @@ import { OCRClient } from 'tesseract-wasm';
  * Configuration for Tesseract OCR
  */
 export interface TesseractConfig {
-  workerPath: string;
-  corePath: string;
-  trainingDataPath: string;
+  workerPath: string; // Path to the worker file
+  corePath: string; // Path to the WebAssembly core file
+  trainingDataPath: string; // Path to the English training data
   fallbackPaths?: {
     workerPath: string;
     corePath: string;
     trainingDataPath: string;
   };
 }
+
+// Default configuration for Tesseract
+export const TESSERACT_CONFIG: TesseractConfig = {
+  workerPath: process.env.TESSERACT_WORKER_PATH || '/tessdata/tesseract-worker.js',
+  corePath: process.env.TESSERACT_CORE_PATH || '/tessdata/tesseract-core.wasm',
+  trainingDataPath: process.env.TESSERACT_TRAINING_PATH || '/tessdata/eng.traineddata',
+  fallbackPaths: {
+    workerPath: '/tesseract-worker.js',
+    corePath: '/tesseract-core.wasm',
+    trainingDataPath: '/eng.traineddata',
+  },
+};
 
 /**
  * Validation result interface
@@ -191,13 +203,16 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
  */
 export const createOCRClient = async (options: OCRClientOptions = {}): Promise<OCRClient> => {
   console.log('Initializing OCR client...');
+
+  // Set up the paths for English only
   const config: TesseractConfig = {
     workerPath: options.workerPath || TESSERACT_CONFIG.workerPath,
     corePath: options.corePath || TESSERACT_CONFIG.corePath,
-    trainingDataPath: options.trainingDataPath || `/tessdata/${options.language || 'eng'}.traineddata`,
+    trainingDataPath: TESSERACT_CONFIG.trainingDataPath, // Always use English
     fallbackPaths: TESSERACT_CONFIG.fallbackPaths,
   };
 
+  // Verify the required files exist
   const verification = await verifyOCRFiles(config);
   if (!verification.success) throw new Error(verification.message);
 
@@ -207,6 +222,7 @@ export const createOCRClient = async (options: OCRClientOptions = {}): Promise<O
     trainingDataPath: verification.validationResults['Training Data'].path,
   };
 
+  // Initialize the OCR client
   const client = new OCRClient({
     workerPath: paths.workerPath,
     corePath: paths.corePath,
