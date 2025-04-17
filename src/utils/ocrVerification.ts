@@ -1,4 +1,3 @@
-
 import { TESSERACT_CONFIG, checkFileExists, checkFileWithFallback, validateWasmFile } from './tesseractConfig';
 
 /**

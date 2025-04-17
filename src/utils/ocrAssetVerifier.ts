@@ -1,4 +1,3 @@
-
 import { TESSERACT_CONFIG, checkFileExists, validateWasmFile } from './tesseractConfig';
 
 /**
@@ -6,6 +5,8 @@ import { TESSERACT_CONFIG, checkFileExists, validateWasmFile } from './tesseract
  */
 export const verifyOCRAssets = async (): Promise<{
   success: boolean;
+  missingFiles: string[];
+  message: string;
   details: {
     files: Record<string, {
       exists: boolean;
@@ -23,6 +24,7 @@ export const verifyOCRAssets = async (): Promise<{
     };
     suggestions: string[];
   };
+  browserInfo?: any;
 }> => {
   console.log('🔍 Starting comprehensive OCR asset verification...');
   
@@ -53,6 +55,7 @@ export const verifyOCRAssets = async (): Promise<{
   const fileStatus: Record<string, any> = {};
   let overallSuccess = true;
   const suggestions: string[] = [];
+  const missingFiles: string[] = [];
   
   // Check each file existence and validity
   for (const file of filesToCheck) {
@@ -67,6 +70,7 @@ export const verifyOCRAssets = async (): Promise<{
     if (!exists) {
       console.error(`❌ ${file.name} not found at ${file.path}`);
       overallSuccess = false;
+      missingFiles.push(file.name);
       continue;
     }
     
@@ -80,6 +84,7 @@ export const verifyOCRAssets = async (): Promise<{
         if (!isValid) {
           console.error(`❌ ${file.name} is not a valid WASM file!`);
           overallSuccess = overallSuccess && false;
+          missingFiles.push(`${file.name} (invalid)`);
         } else {
           console.log(`✅ ${file.name} is a valid WASM file`);
           
@@ -101,6 +106,7 @@ export const verifyOCRAssets = async (): Promise<{
       console.error(`Error checking ${file.name}:`, error);
       fileStatus[file.name].error = error instanceof Error ? error.message : String(error);
       overallSuccess = false;
+      missingFiles.push(`${file.name} (error)`);
     }
   }
   
@@ -128,13 +134,20 @@ export const verifyOCRAssets = async (): Promise<{
     suggestions.push('Invalid WASM file detected. This may be due to a CORS issue or corrupted download. Try running the copy-wasm-assets.cjs script again.');
   }
   
+  const message = overallSuccess 
+    ? 'All OCR files verified successfully' 
+    : `Missing or invalid OCR files: ${missingFiles.join(', ')}`;
+  
   return {
     success: overallSuccess,
+    missingFiles,
+    message,
     details: {
       files: fileStatus,
       browserInfo,
       suggestions
-    }
+    },
+    browserInfo
   };
 };
 
