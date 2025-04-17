@@ -29,26 +29,45 @@ export const performOCR = async (
 
     // Step 1: Initialize OCR client with blob-based worker
     logger('⚙️ Initializing OCR Client...');
-    ocrClient = await createOCRClient({
-      progressCallback: normalizedOptions.progressCallback,
-      logger,
-      corePath: normalizedOptions.corePath,
-      trainingDataPath: normalizedOptions.trainingDataPath
-    });
+    
+    // Check for cached paths in session storage
+    const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+    const cachedTrainingDataPath = sessionStorage.getItem('ocr-training-data-path');
+    
+    const clientOptions: OCROptions = {
+      ...normalizedOptions
+    };
+    
+    if (cachedWasmPath) {
+      logger(`📦 Using cached WASM path: ${cachedWasmPath}`);
+      clientOptions.corePath = cachedWasmPath;
+    }
+    
+    if (cachedTrainingDataPath) {
+      logger(`📦 Using cached training data path: ${cachedTrainingDataPath}`);
+      clientOptions.trainingDataPath = cachedTrainingDataPath;
+    }
+    
+    ocrClient = await createOCRClient(clientOptions);
     
     logger('✅ Model loaded successfully.');
 
     // Step 2: Convert file to image
+    logger('🖼️ Converting file to image...');
     const imageBitmap = await createImageBitmap(file);
     logger(`🖼️ Image loaded: ${imageBitmap.width} x ${imageBitmap.height}`);
 
     // Step 3: Process image
+    logger('🔎 Processing image with OCR...');
     await ocrClient.loadImage(imageBitmap);
     const text = await ocrClient.getText();
     logger('📝 OCR Text Extracted');
 
     // Step 4: Estimate confidence
-    const confidence = text.length > 400 ? 95 : text.length > 200 ? 88 : 75;
+    const wordCount = text.split(/\s+/).length;
+    const confidence = wordCount > 100 ? 95 : wordCount > 50 ? 88 : wordCount > 20 ? 80 : 75;
+    
+    logger(`🔍 OCR complete: extracted ${text.length} characters, ${wordCount} words, estimated confidence: ${confidence}%`);
 
     return {
       text,
@@ -58,11 +77,26 @@ export const performOCR = async (
   } catch (error: any) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('❌ OCR error:', message);
+    
+    // Add detailed diagnostic information about what went wrong
+    console.error('OCR Diagnostic Information:', {
+      fileType: file.type,
+      fileSize: file.size,
+      cachedWasmPath: sessionStorage.getItem('ocr-wasm-path'),
+      cachedTrainingDataPath: sessionStorage.getItem('ocr-training-data-path'),
+      browserInfo: {
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+      },
+      errorDetails: error
+    });
+    
     throw new Error(`OCR failed: ${message}`);
   } finally {
     if (ocrClient) {
       try {
         ocrClient.destroy();
+        logger('🧹 OCR client destroyed');
       } catch (cleanupError) {
         console.warn('⚠️ OCR cleanup failed:', cleanupError);
       }
