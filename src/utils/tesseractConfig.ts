@@ -1,28 +1,38 @@
+
 import { OCRClient } from 'tesseract-wasm';
 
 /**
- * Configuration for Tesseract OCR
+ * Interface for Tesseract Configuration
+ */
+interface TesseractConfig {
+  workerPath: string;
+  corePath: string;
+  trainingDataPath: string;
+  fallbackPaths?: {
+    workerPath: string;
+    corePath: string;
+    trainingDataPath: string;
+  };
+}
+
+// WASM file magic bytes constant (WebAssembly binary format identifier)
+const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
+
+/**
+ * Default configuration for Tesseract
+ * Using multiple potential paths to improve resilience
  */
 export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: 'https://verify-flow.com/tessdata/tesseract-worker.js',
-  corePath: 'https://verify-flow.com/tessdata/tesseract-core.wasm',
-  trainingDataPath: 'https://verify-flow.com/tessdata/eng.traineddata', // Updated path
+  // Primary paths - CDN or hosted paths
+  workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
+  corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+  trainingDataPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+  
+  // Fallback paths - local deployment paths
   fallbackPaths: {
-    workerPath: '/tesseract-worker.js',
-    corePath: '/tesseract-core.wasm',
+    workerPath: '/tessdata/tesseract-worker.js',
+    corePath: '/tessdata/tesseract-core.wasm',
     trainingDataPath: '/tessdata/eng.traineddata',
-  },
-};
-
-// Default configuration for Tesseract
-export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: process.env.TESSERACT_WORKER_PATH || '/tessdata/tesseract-worker.js',
-  corePath: process.env.TESSERACT_CORE_PATH || '/tessdata/tesseract-core.wasm',
-  trainingDataPath: process.env.TESSERACT_TRAINING_PATH || '/tessdata/eng.traineddata',
-  fallbackPaths: {
-    workerPath: '/tesseract-worker.js',
-    corePath: '/tesseract-core.wasm',
-    trainingDataPath: '/eng.traineddata',
   },
 };
 
@@ -47,29 +57,19 @@ interface OCRClientOptions {
   language?: string;
 }
 
-// WASM file magic bytes constant
-const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
-
-/**
- * Default configuration for Tesseract
- */
-export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: process.env.TESSERACT_WORKER_PATH || '/tessdata/tesseract-worker.js',
-  corePath: process.env.TESSERACT_CORE_PATH || '/tessdata/tesseract-core.wasm',
-  trainingDataPath: process.env.TESSERACT_TRAINING_PATH || '/tessdata/eng.traineddata',
-  fallbackPaths: {
-    workerPath: '/tesseract-worker.js',
-    corePath: '/tesseract-core.wasm',
-    trainingDataPath: '/eng.traineddata',
-  },
-};
-
 /**
  * Check if a file exists by making a HEAD request
  */
 export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
-    const response = await fetch(url, { method: 'HEAD' });
+    // Add cache-busting parameter to prevent caching issues
+    const urlWithCache = new URL(url, window.location.origin);
+    urlWithCache.searchParams.append('_t', Date.now().toString());
+    
+    const response = await fetch(urlWithCache.toString(), { 
+      method: 'HEAD',
+      cache: 'no-store' // Explicitly avoid caching
+    });
     return response.ok;
   } catch (error) {
     console.error(`Failed to check file at ${url}:`, error);
@@ -78,17 +78,39 @@ export const checkFileExists = async (url: string): Promise<boolean> => {
 };
 
 /**
+ * Check for a file at both primary and fallback locations
+ */
+export const checkFileWithFallback = async (
+  primaryPath: string,
+  fallbackPath?: string
+): Promise<{ exists: boolean; path: string }> => {
+  // First try the primary path
+  const primaryExists = await checkFileExists(primaryPath);
+  if (primaryExists) {
+    return { exists: true, path: primaryPath };
+  }
+  
+  // If primary doesn't exist and fallback is provided, try that
+  if (fallbackPath) {
+    const fallbackExists = await checkFileExists(fallbackPath);
+    if (fallbackExists) {
+      return { exists: true, path: fallbackPath };
+    }
+  }
+  
+  // Neither path worked
+  return { exists: false, path: primaryPath };
+};
+
+/**
  * Validate a WASM file by checking its magic bytes
  */
-export const validateWasmFile = async (url: string): Promise<ValidationResult> => {
+export const validateWasmFile = async (url: string): Promise<boolean> => {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
-      return {
-        success: false,
-        path: url,
-        error: `HTTP error: ${response.status}`,
-      };
+      console.error(`HTTP error when validating WASM: ${response.status}`);
+      return false;
     }
 
     const buffer = await response.arrayBuffer();
@@ -96,11 +118,8 @@ export const validateWasmFile = async (url: string): Promise<ValidationResult> =
 
     // Check file size
     if (bytes.length < WASM_MAGIC_BYTES.length) {
-      return {
-        success: false,
-        path: url,
-        error: `File too small: ${bytes.length} bytes`,
-      };
+      console.error(`WASM file too small: ${bytes.length} bytes`);
+      return false;
     }
 
     // Check magic bytes
@@ -109,22 +128,14 @@ export const validateWasmFile = async (url: string): Promise<ValidationResult> =
       const foundBytes = Array.from(bytes.slice(0, 4))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join(' ');
-      return {
-        success: false,
-        path: url,
-        error: `Invalid WASM header. Expected: ${Array.from(WASM_MAGIC_BYTES)
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join(' ')}, Found: ${foundBytes}`,
-      };
+      console.error(`Invalid WASM header. Expected: 00 61 73 6d, Found: ${foundBytes}`);
+      return false;
     }
 
-    return { success: true, path: url };
+    return true;
   } catch (error) {
-    return {
-      success: false,
-      path: url,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    console.error(`Error validating WASM file at ${url}:`, error);
+    return false;
   }
 };
 
@@ -138,24 +149,40 @@ export const resolveBestPath = async (
 ): Promise<ValidationResult> => {
   console.log(`Checking ${fileType} at primary path: ${primaryPath}`);
   if (await checkFileExists(primaryPath)) {
-    const validation = fileType === 'Core WASM' ? await validateWasmFile(primaryPath) : { success: true, path: primaryPath };
-    if (validation.success) return validation;
-    console.warn(`Invalid ${fileType} at primary path: ${validation.error}`);
+    const isValid = fileType === 'Core WASM' ? await validateWasmFile(primaryPath) : true;
+    if (isValid) return { success: true, path: primaryPath };
+    console.warn(`Invalid ${fileType} at primary path`);
   }
 
   if (fallbackPath) {
     console.log(`Trying ${fileType} at fallback path: ${fallbackPath}`);
     if (await checkFileExists(fallbackPath)) {
-      const validation = fileType === 'Core WASM' ? await validateWasmFile(fallbackPath) : { success: true, path: fallbackPath };
-      if (validation.success) return validation;
-      console.warn(`Invalid ${fileType} at fallback path: ${validation.error}`);
+      const isValid = fileType === 'Core WASM' ? await validateWasmFile(fallbackPath) : true;
+      if (isValid) return { success: true, path: fallbackPath };
+      console.warn(`Invalid ${fileType} at fallback path`);
+    }
+  }
+
+  // Try additional public paths for traineddata files
+  if (fileType === 'Training Data') {
+    const additionalPaths = [
+      '/eng.traineddata',
+      '/public/eng.traineddata',
+      '/public/tessdata/eng.traineddata'
+    ];
+    
+    for (const path of additionalPaths) {
+      console.log(`Trying additional training data path: ${path}`);
+      if (await checkFileExists(path)) {
+        return { success: true, path };
+      }
     }
   }
 
   return {
     success: false,
     path: primaryPath,
-    error: `File not found or invalid at both primary (${primaryPath}) and fallback (${fallbackPath || 'N/A'}) paths.`,
+    error: `File not found at any location: primary (${primaryPath}) or fallback paths`,
   };
 };
 
@@ -167,6 +194,21 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
   validationResults: Record<string, ValidationResult>;
   message: string;
 }> => {
+  // Check for cached Blob URL from direct download first
+  const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+  if (cachedWasmPath && cachedWasmPath.startsWith('blob:')) {
+    console.log('Using cached WASM blob URL:', cachedWasmPath);
+    return {
+      success: true,
+      validationResults: {
+        'Worker JS': { success: true, path: config.workerPath },
+        'Core WASM': { success: true, path: cachedWasmPath },
+        'Training Data': { success: true, path: config.trainingDataPath }
+      },
+      message: 'Using cached WASM file'
+    };
+  }
+
   const filesToCheck = [
     { name: 'Worker JS', primary: config.workerPath, fallback: config.fallbackPaths?.workerPath },
     { name: 'Core WASM', primary: config.corePath, fallback: config.fallbackPaths?.corePath },
@@ -202,19 +244,29 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
  * Initialize OCR client with configuration
  */
 export const createOCRClient = async (options: OCRClientOptions = {}): Promise<OCRClient> => {
-  console.log('Initializing OCR client...');
+  console.log('Initializing OCR client with options:', options);
 
-  // Set up the paths for English only
+  // Check for cached WASM path from session storage
+  const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+  if (cachedWasmPath && !options.corePath) {
+    console.log('Using cached WASM path from session storage:', cachedWasmPath);
+    options.corePath = cachedWasmPath;
+  }
+
+  // If custom paths are provided in options, use those
   const config: TesseractConfig = {
     workerPath: options.workerPath || TESSERACT_CONFIG.workerPath,
     corePath: options.corePath || TESSERACT_CONFIG.corePath,
-    trainingDataPath: TESSERACT_CONFIG.trainingDataPath, // Always use English
+    trainingDataPath: options.trainingDataPath || TESSERACT_CONFIG.trainingDataPath,
     fallbackPaths: TESSERACT_CONFIG.fallbackPaths,
   };
 
   // Verify the required files exist
   const verification = await verifyOCRFiles(config);
-  if (!verification.success) throw new Error(verification.message);
+  
+  if (!verification.success) {
+    throw new Error(`Failed to initialize OCR client: ${verification.message}`);
+  }
 
   const paths = {
     workerPath: verification.validationResults['Worker JS'].path,
@@ -222,11 +274,13 @@ export const createOCRClient = async (options: OCRClientOptions = {}): Promise<O
     trainingDataPath: verification.validationResults['Training Data'].path,
   };
 
+  console.log('Initializing OCR client with resolved paths:', paths);
+
   // Initialize the OCR client
   const client = new OCRClient({
     workerPath: paths.workerPath,
     corePath: paths.corePath,
-    logger: options.logger,
+    logger: options.logger || console.log,
   });
 
   console.log('Loading OCR model:', paths.trainingDataPath);
