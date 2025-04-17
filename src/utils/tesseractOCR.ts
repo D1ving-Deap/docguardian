@@ -1,37 +1,13 @@
+
 // src/utils/tesseractOCR.ts
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
-import { TESSERACT_CONFIG } from './tesseractConfig';
 
 interface OCROptions {
   progressCallback?: (progress: number) => void;
   logger?: (message: any) => void;
 }
-
-/** Helper to HEAD check an asset path */
-const checkAsset = async (url: string): Promise<boolean> => {
-  try {
-    const res = await fetch(url, { method: 'HEAD' });
-    return res.ok;
-  } catch {
-    return false;
-  }
-};
-
-/** Determine fallback paths */
-const resolveAssetPath = async (
-  label: string,
-  primary: string,
-  fallback?: string
-): Promise<string> => {
-  if (await checkAsset(primary)) return primary;
-  if (fallback && await checkAsset(fallback)) return fallback;
-
-  throw new Error(
-    `${label} not found or unreachable.\nTried:\n→ ${primary}\n→ ${fallback || 'N/A'}`
-  );
-};
 
 /** Perform OCR and return extracted text + confidence */
 export const performOCR = async (
@@ -44,32 +20,13 @@ export const performOCR = async (
     const logger = options.logger || console.log;
     logger('🔍 Starting OCR processing...');
 
-    // Resolve asset paths with fallback
-    const corePath = await resolveAssetPath(
-      'Core WASM',
-      TESSERACT_CONFIG.corePath,
-      TESSERACT_CONFIG.fallbackPaths?.corePath
-    );
-    const workerPath = await resolveAssetPath(
-      'Worker JS',
-      TESSERACT_CONFIG.workerPath,
-      TESSERACT_CONFIG.fallbackPaths?.workerPath
-    );
-    const trainingDataPath = await resolveAssetPath(
-      'Training Data',
-      TESSERACT_CONFIG.trainingDataPath,
-      TESSERACT_CONFIG.fallbackPaths?.trainingDataPath
-    );
-
-    // Step 1: Initialize OCR client
+    // Step 1: Initialize OCR client with blob-based worker
     logger('⚙️ Initializing OCR Client...');
-    ocrClient = new OCRClient({
-      corePath,
-      workerPath,
-      logger,
+    ocrClient = await createOCRClient({
+      progressCallback: options.progressCallback,
+      logger
     });
-
-    await ocrClient.loadModel(trainingDataPath, options.progressCallback);
+    
     logger('✅ Model loaded successfully.');
 
     // Step 2: Convert file to image

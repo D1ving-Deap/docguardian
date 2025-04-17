@@ -1,4 +1,6 @@
+
 import { OCRClient } from 'tesseract-wasm';
+import { createTesseractWorker } from './createTesseractWorker';
 
 /** OCR Client configuration options */
 interface OCRClientOptions {
@@ -53,6 +55,36 @@ export const checkFileExists = async (url: string): Promise<boolean> => {
     return res.ok;
   } catch {
     return false;
+  }
+};
+
+/**
+ * Check file existence with fallback
+ */
+export const checkFileWithFallback = async (
+  primaryPath: string,
+  fallbackPath?: string
+): Promise<{ exists: boolean; path: string }> => {
+  // Try primary path first
+  try {
+    const primaryExists = await checkFileExists(primaryPath);
+    if (primaryExists) {
+      return { exists: true, path: primaryPath };
+    }
+    
+    // If primary fails and fallback exists, try fallback
+    if (fallbackPath) {
+      const fallbackExists = await checkFileExists(fallbackPath);
+      if (fallbackExists) {
+        return { exists: true, path: fallbackPath };
+      }
+    }
+    
+    // Nothing worked
+    return { exists: false, path: primaryPath };
+  } catch (error) {
+    console.error(`Error checking file ${primaryPath}:`, error);
+    return { exists: false, path: primaryPath };
   }
 };
 
@@ -142,8 +174,12 @@ export const createOCRClient = async (options: OCRClientOptions = {}): Promise<O
   const { validationResults, success } = await verifyOCRFiles(TESSERACT_CONFIG);
   if (!success) throw new Error('OCR setup failed. Assets missing or invalid.');
 
+  // Create worker using the blob-based approach
+  console.log('Creating Tesseract worker using blob-based approach');
+  const worker = await createTesseractWorker(options.workerPath || validationResults.worker.path);
+  
   const client = new OCRClient({
-    workerPath: options.workerPath || validationResults.worker.path,
+    worker,
     corePath: options.corePath || validationResults.wasm.path,
     logger: options.logger,
   });
