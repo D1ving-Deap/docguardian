@@ -27,7 +27,14 @@ const getBaseUrl = (): string => {
   
   // Get current path segments to correctly handle subdirectories in deployed apps
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
-  const basePath = pathSegments.length > 0 ? `/${pathSegments[0]}` : '';
+  
+  // For routes like /dashboard, we need to ensure we're looking at the root
+  // Remove dashboard or other route names from consideration
+  const validSegments = pathSegments.filter(segment => 
+    !['dashboard', 'login', 'register', 'verify', 'reset'].includes(segment)
+  );
+  
+  const basePath = validSegments.length > 0 ? `/${validSegments[0]}` : '';
   
   console.log('Using base URL:', baseUrl, 'with base path:', basePath);
   return baseUrl + basePath;
@@ -39,13 +46,13 @@ const getBaseUrl = (): string => {
  */
 export const TESSERACT_CONFIG: TesseractConfig = {
   // Primary paths - CDN or hosted paths
-  workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
+  workerPath: `${getBaseUrl()}/tessdata/tesseract-worker.js`, // Try local assets first
   corePath: `${getBaseUrl()}/tessdata/tesseract-core.wasm`, // Try local assets first
   trainingDataPath: `${getBaseUrl()}/tessdata/eng.traineddata`, // Local path by default
   
-  // Fallback paths - local deployment and CDN paths
+  // Fallback paths - CDN and alternate local paths
   fallbackPaths: {
-    workerPath: `${getBaseUrl()}/tessdata/tesseract-worker.js`,
+    workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
     corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
     trainingDataPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
   },

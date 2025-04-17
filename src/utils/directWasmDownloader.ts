@@ -1,4 +1,3 @@
-
 /**
  * Direct WASM downloader utility to fetch WebAssembly files from trusted sources
  */
@@ -12,7 +11,14 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
     
     // Get current path segments to correctly handle subdirectories
     const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const basePath = pathSegments.length > 0 ? `/${pathSegments[0]}` : '';
+    
+    // For routes like /dashboard, we need to ensure we're looking at the root
+    // Remove dashboard or other route names from consideration
+    const validSegments = pathSegments.filter(segment => 
+      !['dashboard', 'login', 'register', 'verify', 'reset'].includes(segment)
+    );
+    
+    const basePath = validSegments.length > 0 ? `/${validSegments[0]}` : '';
     console.log('Base path:', basePath);
     
     // Create absolute paths based on current location
@@ -23,21 +29,20 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
     };
     
     const wasmSources = [
-      // Local paths as priority (these will work in production)
+      // Local paths with absolute URLs - highest priority
       `${baseUrl}/tessdata/tesseract-core.wasm`,
-      `${baseUrl}${basePath}/tessdata/tesseract-core.wasm`,
+      // Alternate local paths - second priority
       `${baseUrl}/tesseract-core.wasm`,
-      `${baseUrl}${basePath}/tesseract-core.wasm`,
-      // Asset folder paths
+      // Asset folder paths - third priority
       `${baseUrl}/assets/tessdata/tesseract-core.wasm`,
       `${baseUrl}/assets/tesseract-core.wasm`,
-      // Static folder paths for various frameworks
+      // Static folder paths for various frameworks - fourth priority
       `${baseUrl}/static/tessdata/tesseract-core.wasm`,
       `${baseUrl}/static/tesseract-core.wasm`,
-      // Public folder explicit paths
+      // Public folder explicit paths - fifth priority
       `${baseUrl}/public/tessdata/tesseract-core.wasm`,
       `${baseUrl}/public/tesseract-core.wasm`,
-      // Then try CDN sources
+      // Then try CDN sources as last resort
       'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
       'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
       'https://raw.githubusercontent.com/zliide/tesseract-wasm/master/dist/tesseract-core.wasm',
@@ -161,28 +166,33 @@ export const downloadTrainingData = async (): Promise<boolean> => {
     
     // Get current path segments to correctly handle subdirectories
     const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const basePath = pathSegments.length > 0 ? `/${pathSegments[0]}` : '';
+    
+    // For routes like /dashboard, we need to ensure we're looking at the root
+    // Remove dashboard or other route names from consideration
+    const validSegments = pathSegments.filter(segment => 
+      !['dashboard', 'login', 'register', 'verify', 'reset'].includes(segment)
+    );
+    
+    const basePath = validSegments.length > 0 ? `/${validSegments[0]}` : '';
     
     // List of reliable sources for eng.traineddata
     const trainingDataSources = [
-      // Local paths as priority (these will work in production)
+      // Local paths with absolute URLs - highest priority
       `${baseUrl}/tessdata/eng.traineddata`,
-      `${baseUrl}${basePath}/tessdata/eng.traineddata`,
+      // Root-level paths - second priority
       `${baseUrl}/eng.traineddata`,
-      `${baseUrl}${basePath}/eng.traineddata`,
-      // Asset folder paths
+      // CDN sources as reliable fallbacks - third priority
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+      'https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/eng.traineddata',
+      // Asset folder paths - fourth priority
       `${baseUrl}/assets/tessdata/eng.traineddata`,
       `${baseUrl}/assets/eng.traineddata`,
-      // Static folder paths
+      // Static folder paths - fifth priority
       `${baseUrl}/static/tessdata/eng.traineddata`,
       `${baseUrl}/static/eng.traineddata`,
-      // Public folder explicit paths
+      // Public folder explicit paths - sixth priority
       `${baseUrl}/public/tessdata/eng.traineddata`,
-      `${baseUrl}/public/eng.traineddata`,
-      // CDN sources as fallback
-      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
-      'https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata',
-      'https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata'
+      `${baseUrl}/public/eng.traineddata`
     ];
     
     // Check if already cached
@@ -241,13 +251,15 @@ export const downloadTrainingData = async (): Promise<boolean> => {
       }
     }
     
-    // Local fallback as last resort - force use the local path even if we couldn't verify it
-    console.warn('Could not verify any training data source, using local fallback');
-    
-    // Store the most likely path based on the current origin
-    const fallbackPath = `${baseUrl}/tessdata/eng.traineddata`;
-    sessionStorage.setItem('ocr-training-data-path', fallbackPath);
-    console.log('Using fallback training data path:', fallbackPath);
+    // GitHub raw content fallback as last resort
+    try {
+      const githubSourceUrl = 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata';
+      console.log('Trying GitHub raw content as last resort:', githubSourceUrl);
+      sessionStorage.setItem('ocr-training-data-path', githubSourceUrl);
+      return true;
+    } catch (error) {
+      console.error('Error setting GitHub fallback:', error);
+    }
     
     return false;
   } catch (error) {
