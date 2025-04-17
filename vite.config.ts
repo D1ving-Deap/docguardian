@@ -1,3 +1,4 @@
+
 // vite.config.ts
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
@@ -8,6 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "0.0.0.0",
     port: 8080,
   },
+  base: '/', // Force root-relative path resolution
   plugins: [
     react(),
     // Dynamically load development plugins
@@ -36,7 +38,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     assetsInlineLimit: 0, // Prevent WASM inlining
   },
-  assetsInclude: ['**/*.wasm'], // ✅ Explicitly include WASM
+  assetsInclude: ['**/*.wasm', '**/*.traineddata'], // Explicitly include WASM and training data files
   optimizeDeps: {
     exclude: ['tesseract-wasm'],
   },

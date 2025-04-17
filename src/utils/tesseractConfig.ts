@@ -1,3 +1,4 @@
+
 import { OCRClient } from 'tesseract-wasm';
 
 /** OCR Client configuration options */
@@ -16,6 +17,12 @@ interface ValidationResult {
   path: string;
   error?: string;
   label?: string;
+}
+
+/** File check result */
+interface FileCheckResult {
+  exists: boolean;
+  path: string;
 }
 
 /** Tesseract config interface */
@@ -38,9 +45,9 @@ export const TESSERACT_CONFIG: TesseractConfig = {
   corePath: `${BASE_PATH}/tesseract-core.wasm`,
   trainingDataPath: `${BASE_PATH}/eng.traineddata`,
   fallbackPaths: {
-    workerPath: 'https://your-cdn.com/tesseract-worker.js',
-    corePath: 'https://your-cdn.com/tesseract-core.wasm',
-    trainingDataPath: 'https://your-cdn.com/eng.traineddata',
+    workerPath: undefined,
+    corePath: undefined,
+    trainingDataPath: undefined,
   }
 };
 
@@ -49,11 +56,44 @@ const validationCache: Record<string, ValidationResult> = {};
 
 export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
-    const res = await fetch(url, { method: 'HEAD' });
+    // Use absolute URL resolution to avoid path issues with nested routes
+    let absoluteUrl = url;
+    if (!url.startsWith('http') && !url.startsWith('blob:')) {
+      // Make path absolute if it's not already
+      const baseOrigin = window.location.origin;
+      absoluteUrl = url.startsWith('/') 
+        ? `${baseOrigin}${url}` 
+        : `${baseOrigin}/${url}`;
+    }
+    
+    console.log(`Checking if file exists: ${absoluteUrl}`);
+    const res = await fetch(absoluteUrl, { method: 'HEAD' });
     return res.ok;
   } catch {
     return false;
   }
+};
+
+export const checkFileWithFallback = async (
+  primaryPath: string,
+  fallbackPath?: string
+): Promise<FileCheckResult> => {
+  // First try primary path
+  const primaryExists = await checkFileExists(primaryPath);
+  if (primaryExists) {
+    return { exists: true, path: primaryPath };
+  }
+  
+  // If fallback path is provided, try that next
+  if (fallbackPath) {
+    const fallbackExists = await checkFileExists(fallbackPath);
+    if (fallbackExists) {
+      return { exists: true, path: fallbackPath };
+    }
+  }
+  
+  // If we get here, neither path worked
+  return { exists: false, path: primaryPath };
 };
 
 export const validateWasmFile = async (url: string): Promise<ValidationResult> => {

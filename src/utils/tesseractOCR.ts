@@ -1,18 +1,33 @@
+
 // src/utils/tesseractOCR.ts
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
 import { TESSERACT_CONFIG } from './tesseractConfig';
+import { createWorkerBlobURL, createTesseractWorker } from './createWorkerBlobURL';
 
 interface OCROptions {
   progressCallback?: (progress: number) => void;
   logger?: (message: any) => void;
+  corePath?: string;
+  workerPath?: string;
+  trainingDataPath?: string;
 }
 
 /** Helper to HEAD check an asset path */
 const checkAsset = async (url: string): Promise<boolean> => {
   try {
-    const res = await fetch(url, { method: 'HEAD' });
+    // Make URL absolute to avoid nested route issues
+    let absoluteUrl = url;
+    if (!url.startsWith('http') && !url.startsWith('blob:')) {
+      const baseOrigin = window.location.origin;
+      absoluteUrl = url.startsWith('/') 
+        ? `${baseOrigin}${url}` 
+        : `${baseOrigin}/${url}`;
+    }
+    
+    console.log(`Checking asset at: ${absoluteUrl}`);
+    const res = await fetch(absoluteUrl, { method: 'HEAD' });
     return res.ok;
   } catch {
     return false;
@@ -39,23 +54,24 @@ export const performOCR = async (
   options: OCROptions = {}
 ): Promise<OCRResult> => {
   let ocrClient: OCRClient | null = null;
+  let workerBlobURL: string | null = null;
 
   try {
     const logger = options.logger || console.log;
     logger('🔍 Starting OCR processing...');
 
+    // Create worker blob URL for the worker script
+    workerBlobURL = await createWorkerBlobURL(options.workerPath || TESSERACT_CONFIG.workerPath);
+    logger(`⚙️ Created worker blob URL: ${workerBlobURL}`);
+
     // Resolve asset paths with fallback
-    const corePath = await resolveAssetPath(
+    const corePath = options.corePath || await resolveAssetPath(
       'Core WASM',
       TESSERACT_CONFIG.corePath,
       TESSERACT_CONFIG.fallbackPaths?.corePath
     );
-    const workerPath = await resolveAssetPath(
-      'Worker JS',
-      TESSERACT_CONFIG.workerPath,
-      TESSERACT_CONFIG.fallbackPaths?.workerPath
-    );
-    const trainingDataPath = await resolveAssetPath(
+    
+    const trainingDataPath = options.trainingDataPath || await resolveAssetPath(
       'Training Data',
       TESSERACT_CONFIG.trainingDataPath,
       TESSERACT_CONFIG.fallbackPaths?.trainingDataPath
@@ -65,7 +81,7 @@ export const performOCR = async (
     logger('⚙️ Initializing OCR Client...');
     ocrClient = new OCRClient({
       corePath,
-      workerPath,
+      workerPath: workerBlobURL,
       logger,
     });
 
@@ -99,6 +115,16 @@ export const performOCR = async (
         ocrClient.destroy();
       } catch (cleanupError) {
         console.warn('⚠️ OCR cleanup failed:', cleanupError);
+      }
+    }
+    
+    // Cleanup the blob URL to prevent memory leaks
+    if (workerBlobURL && workerBlobURL.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(workerBlobURL);
+        console.log('Revoked worker blob URL');
+      } catch (revokeError) {
+        console.warn('Failed to revoke worker blob URL:', revokeError);
       }
     }
   }
