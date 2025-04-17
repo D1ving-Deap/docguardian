@@ -2,15 +2,12 @@
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
-import { createWorkerBlobURL } from './createWorkerBlobURL';
 
 interface OCROptions {
   progressCallback?: (progress: number) => void;
   logger?: (message: any) => void;
   corePath?: string;
-  workerPath?: string;
   trainingDataPath?: string;
-  language?: string;
 }
 
 /** Perform OCR and return extracted text + confidence */
@@ -19,7 +16,6 @@ export const performOCR = async (
   options: OCROptions | ((progress: number) => void) = {}
 ): Promise<OCRResult> => {
   let ocrClient: OCRClient | null = null;
-  let workerBlobURL: string | null = null;
   
   // Handle the case where options is a function (backward compatibility)
   const normalizedOptions: OCROptions = typeof options === 'function' 
@@ -32,26 +28,30 @@ export const performOCR = async (
   try {
     logger('🔍 Starting OCR processing...');
 
-    // Step 1: Create fresh worker blob URL
-    logger('⚙️ Creating fresh worker blob URL...');
-    workerBlobURL = await createWorkerBlobURL('/tesseract-worker.js');
-    logger(`Worker blob URL created: ${workerBlobURL}`);
-
-    // Verify the worker script is accessible
-    const workerCheck = await fetch(workerBlobURL);
-    if (!workerCheck.ok) {
-      throw new Error(`Worker blob URL validation failed: ${workerBlobURL}`);
-    }
-
-    // Step 2: Initialize OCR client with blob URL
+    // Step 1: Initialize OCR client with blob-based worker
     logger('⚙️ Initializing OCR Client...');
+    
+    // Check for cached paths in session storage
+    const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+    const cachedTrainingDataPath = sessionStorage.getItem('ocr-training-data-path');
+    
     const clientOptions: OCROptions = {
       ...normalizedOptions,
-      logger,
-      workerPath: workerBlobURL
+      logger  // Pass the logger to client options
     };
     
+    if (cachedWasmPath) {
+      logger(`📦 Using cached WASM path: ${cachedWasmPath}`);
+      clientOptions.corePath = cachedWasmPath;
+    }
+    
+    if (cachedTrainingDataPath) {
+      logger(`📦 Using cached training data path: ${cachedTrainingDataPath}`);
+      clientOptions.trainingDataPath = cachedTrainingDataPath;
+    }
+    
     ocrClient = await createOCRClient(clientOptions);
+    
     logger('✅ Model loaded successfully.');
 
     // Step 2: Convert file to image
@@ -84,7 +84,8 @@ export const performOCR = async (
     console.error('OCR Diagnostic Information:', {
       fileType: file.type,
       fileSize: file.size,
-      workerBlobURL,
+      cachedWasmPath: sessionStorage.getItem('ocr-wasm-path'),
+      cachedTrainingDataPath: sessionStorage.getItem('ocr-training-data-path'),
       browserInfo: {
         userAgent: navigator.userAgent,
         language: navigator.language,
@@ -100,15 +101,6 @@ export const performOCR = async (
         logger('🧹 OCR client destroyed');
       } catch (cleanupError) {
         console.warn('⚠️ OCR cleanup failed:', cleanupError);
-      }
-    }
-    // Clean up blob URL
-    if (workerBlobURL) {
-      try {
-        URL.revokeObjectURL(workerBlobURL);
-        logger('🧹 Worker blob URL revoked');
-      } catch (revokeError) {
-        console.warn('⚠️ Failed to revoke worker blob URL:', revokeError);
       }
     }
   }

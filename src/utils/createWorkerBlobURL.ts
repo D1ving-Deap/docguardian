@@ -19,16 +19,16 @@ export const createWorkerBlobURL = async (scriptPath: string): Promise<string> =
     const patched = js.replace(
       /importScripts\((["'])(.*?)\1\)/g, 
       (_, quote, src) => {
-        // For .wasm files, always use the absolute path to root directory
+        // For .wasm files, always use the absolute path to tessdata directory
         if (src.includes('.wasm')) {
-          const absolutePath = `${window.location.origin}/tesseract-core.wasm`;
+          const absolutePath = `${window.location.origin}/tessdata/tesseract-core.wasm`;
           console.log(`Patching importScripts for WASM: ${src} → ${absolutePath}`);
           return `importScripts("${absolutePath}")`;
         }
         
-        // For other imports, prefix with root path if they don't have a full URL
+        // For other imports, prefix with tessdata if they don't have a full URL
         if (!src.startsWith('http') && !src.startsWith('/')) {
-          const absolutePath = `${window.location.origin}/${src}`;
+          const absolutePath = `${window.location.origin}/tessdata/${src}`;
           console.log(`Patching importScripts: ${src} → ${absolutePath}`);
           return `importScripts("${absolutePath}")`;
         }
@@ -40,13 +40,14 @@ export const createWorkerBlobURL = async (scriptPath: string): Promise<string> =
     // Create blob URL from the patched script
     const blob = new Blob([patched], { type: 'application/javascript' });
     const blobURL = URL.createObjectURL(blob);
-    console.log(`Created fresh worker blob URL: ${blobURL}`);
+    console.log(`Created worker blob URL: ${blobURL}`);
     
-    // Store the source path for debugging, but not the blob URL
+    // Cache the blob URL in session storage for potential reuse
     try {
+      sessionStorage.setItem('ocr-worker-blob-url', blobURL);
       sessionStorage.setItem('ocr-worker-source', scriptPath);
     } catch (storageError) {
-      console.warn('Failed to store worker source in session storage:', storageError);
+      console.warn('Failed to cache worker blob URL in session storage:', storageError);
     }
     
     return blobURL;
@@ -56,5 +57,13 @@ export const createWorkerBlobURL = async (scriptPath: string): Promise<string> =
   }
 };
 
-// Note: getCachedWorkerBlobURL is removed since we always want fresh blobs
-
+/**
+ * Gets a cached worker blob URL if available, or returns null
+ */
+export const getCachedWorkerBlobURL = (): string | null => {
+  try {
+    return sessionStorage.getItem('ocr-worker-blob-url');
+  } catch {
+    return null;
+  }
+};

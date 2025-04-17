@@ -1,3 +1,4 @@
+
 import { OCRClient } from 'tesseract-wasm';
 import { createTesseractWorker } from './createTesseractWorker';
 
@@ -32,16 +33,16 @@ interface TesseractConfig {
 }
 
 // Configurable base path (can also be set via .env if needed)
-const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '';
+const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '/tessdata';
 
 export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: `/tesseract-worker.js`,
-  corePath: `/tesseract-core.wasm`,
-  trainingDataPath: `/eng.traineddata`,
+  workerPath: `${BASE_PATH}/tesseract-worker.js`,
+  corePath: `${BASE_PATH}/tesseract-core.wasm`,
+  trainingDataPath: `${BASE_PATH}/eng.traineddata`,
   fallbackPaths: {
-    workerPath: undefined,
-    corePath: undefined,
-    trainingDataPath: undefined,
+    workerPath: 'https://your-cdn.com/tesseract-worker.js',
+    corePath: 'https://your-cdn.com/tesseract-core.wasm',
+    trainingDataPath: 'https://your-cdn.com/eng.traineddata',
   }
 };
 
@@ -190,8 +191,7 @@ export const createOCRClient = async (options: OCRClientOptions = {}): Promise<O
     
     console.log('Initializing OCR client with paths:', {
       corePath,
-      trainingDataPath,
-      workerPath: options.workerPath || validationResults.worker.path
+      trainingDataPath
     });
     
     const client = new OCRClient({

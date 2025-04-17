@@ -34,11 +34,6 @@ const OCRTest: React.FC = () => {
         setIsVerifying(true);
         console.log('Checking OCR assets availability...');
         
-        // Debug: Log actual config paths
-        console.log("Resolved worker path:", TESSERACT_CONFIG.workerPath);
-        console.log("Resolved core path:", TESSERACT_CONFIG.corePath);
-        console.log("Resolved training data path:", TESSERACT_CONFIG.trainingDataPath);
-        
         // Check if we already have a cached WASM file from a previous direct download
         const cachedWasmBlob = getCachedWasmBlob();
         if (cachedWasmBlob) {
