@@ -1,4 +1,3 @@
-
 import { createWorkerBlobURL } from './createWorkerBlobURL';
 
 /**
@@ -7,9 +6,19 @@ import { createWorkerBlobURL } from './createWorkerBlobURL';
  */
 export const createTesseractWorker = async (workerPath?: string): Promise<Worker> => {
   try {
+    // Check if the workerPath is already a blob URL
+    const isBlob = workerPath?.startsWith('blob:');
+    
     // Use provided path or default
+    if (isBlob) {
+      console.log('Worker path type: blob, using directly:', workerPath);
+      return new Worker(workerPath);
+    }
+    
+    // Otherwise, create a blob URL from the path
     const workerURL = workerPath || '/tesseract-worker.js';
-    console.log('Creating tesseract worker from path:', workerURL);
+    console.log('Creating tesseract worker from path (not blob):', workerURL);
+    console.log('Worker path type: file');
     
     // Create a blob URL with path correction for imports
     const blobURL = await createWorkerBlobURL(workerURL);
