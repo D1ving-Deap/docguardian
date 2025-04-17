@@ -19,16 +19,16 @@ export const createWorkerBlobURL = async (scriptPath: string): Promise<string> =
     const patched = js.replace(
       /importScripts\((["'])(.*?)\1\)/g, 
       (_, quote, src) => {
-        // For .wasm files, always use the absolute path to tessdata directory
+        // For .wasm files, always use the absolute path to root directory
         if (src.includes('.wasm')) {
-          const absolutePath = `${window.location.origin}/tessdata/tesseract-core.wasm`;
+          const absolutePath = `${window.location.origin}/tesseract-core.wasm`;
           console.log(`Patching importScripts for WASM: ${src} → ${absolutePath}`);
           return `importScripts("${absolutePath}")`;
         }
         
-        // For other imports, prefix with tessdata if they don't have a full URL
+        // For other imports, prefix with root path if they don't have a full URL
         if (!src.startsWith('http') && !src.startsWith('/')) {
-          const absolutePath = `${window.location.origin}/tessdata/${src}`;
+          const absolutePath = `${window.location.origin}/${src}`;
           console.log(`Patching importScripts: ${src} → ${absolutePath}`);
           return `importScripts("${absolutePath}")`;
         }

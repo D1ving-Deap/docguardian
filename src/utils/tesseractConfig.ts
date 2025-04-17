@@ -33,12 +33,12 @@ interface TesseractConfig {
 }
 
 // Configurable base path (can also be set via .env if needed)
-const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '/tessdata';
+const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '';
 
 export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: `${BASE_PATH}/tesseract-worker.js`,
-  corePath: `${BASE_PATH}/tesseract-core.wasm`,
-  trainingDataPath: `${BASE_PATH}/eng.traineddata`,
+  workerPath: `/tesseract-worker.js`,
+  corePath: `/tesseract-core.wasm`,
+  trainingDataPath: `/eng.traineddata`,
   fallbackPaths: {
     workerPath: 'https://your-cdn.com/tesseract-worker.js',
     corePath: 'https://your-cdn.com/tesseract-core.wasm',

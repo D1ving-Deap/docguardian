@@ -20,7 +20,7 @@ export const createTesseractWorker = async (workerPath?: string): Promise<Worker
     }
     
     // Use provided path or default
-    const workerURL = workerPath || '/tessdata/tesseract-worker.js';
+    const workerURL = workerPath || '/tesseract-worker.js';
     console.log('Creating tesseract worker from path:', workerURL);
     
     // Create a blob URL with path correction for imports
