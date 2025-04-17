@@ -6,11 +6,11 @@ import { OCRClient } from 'tesseract-wasm';
 export const TESSERACT_CONFIG: TesseractConfig = {
   workerPath: 'https://verify-flow.com/tessdata/tesseract-worker.js',
   corePath: 'https://verify-flow.com/tessdata/tesseract-core.wasm',
-  trainingDataPath: 'https://verify-flow.com/tessdata/eng.traineddata',
+  trainingDataPath: 'https://verify-flow.com/tessdata/eng.traineddata', // Updated path
   fallbackPaths: {
     workerPath: '/tesseract-worker.js',
     corePath: '/tesseract-core.wasm',
-    trainingDataPath: '/eng.traineddata',
+    trainingDataPath: '/tessdata/eng.traineddata',
   },
 };
 
