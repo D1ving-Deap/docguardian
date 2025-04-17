@@ -119,18 +119,18 @@ const OCRTest: React.FC = () => {
 
     try {
       // Check for cached WASM blob URL first
-      let wasmOptions: any = {};
+      let ocrOptions: any = {};
       const cachedWasmBlob = getCachedWasmBlob();
       
       if (cachedWasmBlob) {
         console.log('Using cached WASM blob URL for OCR:', cachedWasmBlob);
-        wasmOptions.corePath = cachedWasmBlob;
+        ocrOptions.corePath = cachedWasmBlob;
       } else {
         // Use custom path from session storage if available
         const customWasmPath = sessionStorage.getItem('ocr-wasm-path');
         if (customWasmPath) {
           console.log('Using custom WASM path from session storage:', customWasmPath);
-          wasmOptions.corePath = customWasmPath;
+          ocrOptions.corePath = customWasmPath;
         }
       }
       
@@ -138,18 +138,21 @@ const OCRTest: React.FC = () => {
       const cachedTrainingPath = sessionStorage.getItem('ocr-training-data-path');
       if (cachedTrainingPath) {
         console.log('Using cached training data path:', cachedTrainingPath);
-        wasmOptions.trainingDataPath = cachedTrainingPath;
+        ocrOptions.trainingDataPath = cachedTrainingPath;
       } else {
         // Force use local training data if no cached path
         console.log('Forcing use of local training data path');
-        wasmOptions.trainingDataPath = '/tessdata/eng.traineddata';
+        ocrOptions.trainingDataPath = '/tessdata/eng.traineddata';
       }
       
-      console.log('Starting OCR with options:', wasmOptions);
+      console.log('Starting OCR with options:', ocrOptions);
       
-      const ocrResult = await performOCR(file, (progress) => {
+      // Update to use the proper options format
+      ocrOptions.progressCallback = (progress: number) => {
         setProgress(progress * 100);
-      }, wasmOptions);
+      };
+      
+      const ocrResult = await performOCR(file, ocrOptions);
       
       setResult(ocrResult.text);
       

@@ -7,24 +7,33 @@ import { OCRResult } from './types/ocrTypes';
 interface OCROptions {
   progressCallback?: (progress: number) => void;
   logger?: (message: any) => void;
+  corePath?: string;
+  trainingDataPath?: string;
 }
 
 /** Perform OCR and return extracted text + confidence */
 export const performOCR = async (
   file: File | Blob,
-  options: OCROptions = {}
+  options: OCROptions | ((progress: number) => void) = {}
 ): Promise<OCRResult> => {
   let ocrClient: OCRClient | null = null;
+  
+  // Handle the case where options is a function (backward compatibility)
+  const normalizedOptions: OCROptions = typeof options === 'function' 
+    ? { progressCallback: options } 
+    : options;
 
   try {
-    const logger = options.logger || console.log;
+    const logger = normalizedOptions.logger || console.log;
     logger('🔍 Starting OCR processing...');
 
     // Step 1: Initialize OCR client with blob-based worker
     logger('⚙️ Initializing OCR Client...');
     ocrClient = await createOCRClient({
-      progressCallback: options.progressCallback,
-      logger
+      progressCallback: normalizedOptions.progressCallback,
+      logger,
+      corePath: normalizedOptions.corePath,
+      trainingDataPath: normalizedOptions.trainingDataPath
     });
     
     logger('✅ Model loaded successfully.');
