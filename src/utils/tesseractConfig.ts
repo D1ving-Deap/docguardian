@@ -3,16 +3,16 @@ import { OCRClient } from 'tesseract-wasm';
 /**
  * Configuration for Tesseract OCR
  */
-export interface TesseractConfig {
-  workerPath: string; // Path to the worker file
-  corePath: string; // Path to the WebAssembly core file
-  trainingDataPath: string; // Path to the English training data
-  fallbackPaths?: {
-    workerPath: string;
-    corePath: string;
-    trainingDataPath: string;
-  };
-}
+export const TESSERACT_CONFIG: TesseractConfig = {
+  workerPath: 'https://verify-flow.com/tessdata/tesseract-worker.js',
+  corePath: 'https://verify-flow.com/tessdata/tesseract-core.wasm',
+  trainingDataPath: 'https://verify-flow.com/tessdata/eng.traineddata',
+  fallbackPaths: {
+    workerPath: '/tesseract-worker.js',
+    corePath: '/tesseract-core.wasm',
+    trainingDataPath: '/eng.traineddata',
+  },
+};
 
 // Default configuration for Tesseract
 export const TESSERACT_CONFIG: TesseractConfig = {
