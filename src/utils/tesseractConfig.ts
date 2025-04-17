@@ -144,12 +144,11 @@ const resolveBestPath = async (
   };
 };
 
-export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG) => {
-  const checks = await Promise.all([
-    resolveBestPath('Worker JS', config.workerPath, config.fallbackPaths?.workerPath),
-    resolveBestPath('Core WASM', config.corePath, config.fallbackPaths?.corePath, true),
-    resolveBestPath('Training Data', config.trainingDataPath, config.fallbackPaths?.trainingDataPath)
-  ]);
+export const TESSERACT_CONFIG: TesseractConfig = {
+  workerPath: '/tessdata/tesseract-worker.js',
+  corePath: '/tessdata/tesseract-core.wasm',
+  trainingDataPath: '/tessdata/eng.traineddata',
+};
 
   const [worker, wasm, trained] = checks;
   const result = {
