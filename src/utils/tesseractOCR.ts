@@ -51,6 +51,7 @@ const resolveAssetPath = async (
 /** Perform OCR and return extracted text + confidence */
 export const performOCR = async (
   file: File | Blob,
+  progressCallback?: (progress: number) => void,
   options: OCROptions = {}
 ): Promise<OCRResult> => {
   let ocrClient: OCRClient | null = null;
@@ -85,7 +86,8 @@ export const performOCR = async (
       logger,
     });
 
-    await ocrClient.loadModel(trainingDataPath, options.progressCallback);
+    // Pass the progress callback
+    await ocrClient.loadModel(trainingDataPath, progressCallback);
     logger('✅ Model loaded successfully.');
 
     // Step 2: Convert file to image

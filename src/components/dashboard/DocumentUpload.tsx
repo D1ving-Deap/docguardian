@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -69,10 +68,13 @@ const DocumentUpload = ({
       
       setProcessingStatus('Reading document text...');
       
-      // Use the WASM-based OCR engine
-      const result = await performOCR(file, (progress) => {
-        setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
-      });
+      // Use the WASM-based OCR engine with progress callback as separate param
+      const result = await performOCR(
+        file, 
+        (progress) => {
+          setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
+        }
+      );
       
       setProcessingStatus('Extracting data from text...');
       
