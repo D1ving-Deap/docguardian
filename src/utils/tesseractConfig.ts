@@ -36,14 +36,12 @@ interface TesseractConfig {
 const BASE_PATH = process.env.TESSERACT_BASE_PATH || '/tessdata';
 
 export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: `${BASE_PATH}/tesseract-worker.js`,
-  corePath: `${BASE_PATH}/tesseract-core.wasm`,
-  trainingDataPath: `${BASE_PATH}/eng.traineddata`,
+  workerPath: '/tessdata/tesseract-worker.js',
+  corePath: '/tessdata/tesseract-core.wasm',
+  trainingDataPath: 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/eng.traineddata',
   fallbackPaths: {
-    workerPath: '/tessdata/tesseract-worker.js',
-    corePath: '/tessdata/tesseract-core.wasm',
-    trainingDataPath: '/tessdata/eng.traineddata',
-  },
+    trainingDataPath: '/tessdata/eng.traineddata'
+  }
 };
 
 const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
