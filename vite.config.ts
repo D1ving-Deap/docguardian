@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    // Dynamically load development plugins
     mode === 'development' && {
       name: 'dynamic-tagger',
       async configResolved(config) {
@@ -32,6 +33,10 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    assetsInlineLimit: 0, // Prevent WASM inlining
+  },
+  assetsInclude: ['**/*.wasm'], // ✅ Explicitly include WASM
   optimizeDeps: {
     exclude: ['tesseract-wasm'],
   },
