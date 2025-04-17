@@ -1,5 +1,5 @@
 
-import { createWorkerBlobURL, getCachedWorkerBlobURL } from './createWorkerBlobURL';
+import { createWorkerBlobURL } from './createWorkerBlobURL';
 
 /**
  * Creates a Tesseract Web Worker from a Blob to avoid MIME type and CORS issues
@@ -7,18 +7,6 @@ import { createWorkerBlobURL, getCachedWorkerBlobURL } from './createWorkerBlobU
  */
 export const createTesseractWorker = async (workerPath?: string): Promise<Worker> => {
   try {
-    // First check if we have a cached blob URL from a previous session
-    const cachedBlobURL = getCachedWorkerBlobURL();
-    if (cachedBlobURL) {
-      console.log('Using cached worker blob URL:', cachedBlobURL);
-      try {
-        return new Worker(cachedBlobURL);
-      } catch (cachedWorkerError) {
-        console.warn('Failed to create worker from cached blob URL:', cachedWorkerError);
-        // Continue to fetch a fresh copy if cached fails
-      }
-    }
-    
     // Use provided path or default
     const workerURL = workerPath || '/tesseract-worker.js';
     console.log('Creating tesseract worker from path:', workerURL);

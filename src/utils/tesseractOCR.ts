@@ -1,4 +1,3 @@
-
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
@@ -8,7 +7,9 @@ interface OCROptions {
   progressCallback?: (progress: number) => void;
   logger?: (message: any) => void;
   corePath?: string;
+  workerPath?: string;
   trainingDataPath?: string;
+  language?: string;
 }
 
 /** Perform OCR and return extracted text + confidence */
@@ -111,4 +112,3 @@ export const performOCR = async (
     }
   }
 };
-
