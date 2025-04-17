@@ -22,11 +22,36 @@ export const performOCR = async (
   try {
     console.log('Starting OCR processing...');
     
+    // Check if we're on a dashboard route and force CDN paths if so
+    const isOnDashboardRoute = window.location.pathname.includes('/dashboard');
+    if (isOnDashboardRoute && !options) {
+      console.log('Detected dashboard route, using CDN paths');
+      options = {
+        corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+        workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
+        trainingDataPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata'
+      };
+    }
+    
     // Check for cached WASM file from direct download
     const cachedWasmBlob = createWasmBlobUrl();
     if (cachedWasmBlob && !options?.corePath) {
       console.log('Using cached WASM blob URL for OCR:', cachedWasmBlob);
       options = { ...options, corePath: cachedWasmBlob };
+    }
+    
+    // Also check for cached paths in session storage
+    const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+    const cachedTrainingPath = sessionStorage.getItem('ocr-training-data-path');
+    
+    if (cachedWasmPath && !options?.corePath) {
+      console.log('Using cached WASM path for OCR:', cachedWasmPath);
+      options = { ...options, corePath: cachedWasmPath };
+    }
+    
+    if (cachedTrainingPath && !options?.trainingDataPath) {
+      console.log('Using cached training data path for OCR:', cachedTrainingPath);
+      options = { ...options, trainingDataPath: cachedTrainingPath };
     }
     
     // Initialize OCR client

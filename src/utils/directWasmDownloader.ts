@@ -4,50 +4,18 @@
 export const downloadWasmFile = async (destination: string): Promise<boolean> => {
   try {
     console.log('Starting direct WASM download process for:', destination);
-    
-    // List of reliable sources for tesseract-core.wasm with base URL support for production
     const baseUrl = window.location.origin;
-    console.log('Current base URL:', baseUrl);
     
-    // Get current path segments to correctly handle subdirectories
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    // Log important information for debugging
+    console.log('Current URL:', window.location.href);
+    console.log('Base URL:', baseUrl);
+    console.log('Path:', window.location.pathname);
     
-    // For routes like /dashboard, we need to ensure we're looking at the root
-    // Remove dashboard or other route names from consideration
-    const validSegments = pathSegments.filter(segment => 
-      !['dashboard', 'login', 'register', 'verify', 'reset'].includes(segment)
-    );
+    // Check if we're on a subroute in production
+    const isOnSubroute = window.location.pathname.includes('/dashboard') || 
+                        window.location.pathname.includes('/login');
     
-    const basePath = validSegments.length > 0 ? `/${validSegments[0]}` : '';
-    console.log('Base path:', basePath);
-    
-    // Create absolute paths based on current location
-    const absolutePath = (path: string) => {
-      if (path.startsWith('http')) return path;  // Already absolute
-      if (path.startsWith('/')) return `${baseUrl}${path}`;  // Root-relative
-      return `${baseUrl}${basePath ? basePath : ''}/${path}`;  // Document-relative
-    };
-    
-    const wasmSources = [
-      // Local paths with absolute URLs - highest priority
-      `${baseUrl}/tessdata/tesseract-core.wasm`,
-      // Alternate local paths - second priority
-      `${baseUrl}/tesseract-core.wasm`,
-      // Asset folder paths - third priority
-      `${baseUrl}/assets/tessdata/tesseract-core.wasm`,
-      `${baseUrl}/assets/tesseract-core.wasm`,
-      // Static folder paths for various frameworks - fourth priority
-      `${baseUrl}/static/tessdata/tesseract-core.wasm`,
-      `${baseUrl}/static/tesseract-core.wasm`,
-      // Public folder explicit paths - fifth priority
-      `${baseUrl}/public/tessdata/tesseract-core.wasm`,
-      `${baseUrl}/public/tesseract-core.wasm`,
-      // Then try CDN sources as last resort
-      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      'https://raw.githubusercontent.com/zliide/tesseract-wasm/master/dist/tesseract-core.wasm',
-      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract-core.wasm'
-    ];
+    console.log('Is on subroute:', isOnSubroute);
     
     // Check if the WASM file is already cached
     const cachedFile = sessionStorage.getItem('ocr-wasm-binary');
@@ -61,6 +29,25 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
       console.log('WASM blob URL already cached:', cachedPath);
       return true;
     }
+    
+    // For deployed sites, prioritize CDN sources to avoid path issues
+    const wasmSources = isOnSubroute ? [
+      // CDN sources first for subroutes
+      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+      // Then try root paths
+      `${baseUrl}/tesseract-core.wasm`,
+      // Then tessdata subdirectory
+      `${baseUrl}/tessdata/tesseract-core.wasm`,
+    ] : [
+      // Root paths first for main routes
+      `${baseUrl}/tesseract-core.wasm`,
+      // Tessdata subdirectory second
+      `${baseUrl}/tessdata/tesseract-core.wasm`,
+      // Then CDN sources
+      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+    ];
     
     // Try each source until one works
     for (const source of wasmSources) {
@@ -145,6 +132,14 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
       }
     }
     
+    // If all sources failed but we're on a subroute, try saving CDN paths anyway
+    if (isOnSubroute) {
+      console.log('All download attempts failed but we are on a subroute, forcing CDN paths');
+      sessionStorage.setItem('ocr-wasm-path', 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm');
+      sessionStorage.setItem('ocr-training-data-path', 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata');
+      return true;
+    }
+    
     // All sources failed
     console.error('⚠️ All WASM download sources failed');
     return false;
@@ -164,36 +159,9 @@ export const downloadTrainingData = async (): Promise<boolean> => {
     // Get current base URL from the window location
     const baseUrl = window.location.origin;
     
-    // Get current path segments to correctly handle subdirectories
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    
-    // For routes like /dashboard, we need to ensure we're looking at the root
-    // Remove dashboard or other route names from consideration
-    const validSegments = pathSegments.filter(segment => 
-      !['dashboard', 'login', 'register', 'verify', 'reset'].includes(segment)
-    );
-    
-    const basePath = validSegments.length > 0 ? `/${validSegments[0]}` : '';
-    
-    // List of reliable sources for eng.traineddata
-    const trainingDataSources = [
-      // Local paths with absolute URLs - highest priority
-      `${baseUrl}/tessdata/eng.traineddata`,
-      // Root-level paths - second priority
-      `${baseUrl}/eng.traineddata`,
-      // CDN sources as reliable fallbacks - third priority
-      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
-      'https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/eng.traineddata',
-      // Asset folder paths - fourth priority
-      `${baseUrl}/assets/tessdata/eng.traineddata`,
-      `${baseUrl}/assets/eng.traineddata`,
-      // Static folder paths - fifth priority
-      `${baseUrl}/static/tessdata/eng.traineddata`,
-      `${baseUrl}/static/eng.traineddata`,
-      // Public folder explicit paths - sixth priority
-      `${baseUrl}/public/tessdata/eng.traineddata`,
-      `${baseUrl}/public/eng.traineddata`
-    ];
+    // Check if we're on a subroute
+    const isOnSubroute = window.location.pathname.includes('/dashboard') || 
+                         window.location.pathname.includes('/login');
     
     // Check if already cached
     const cachedTrainingData = sessionStorage.getItem('ocr-training-data-path');
@@ -201,6 +169,24 @@ export const downloadTrainingData = async (): Promise<boolean> => {
       console.log('Training data path already cached:', cachedTrainingData);
       return true;
     }
+    
+    // For deployed sites on subroutes, prioritize CDN sources
+    const trainingDataSources = isOnSubroute ? [
+      // CDN sources first for subroutes
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+      'https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/eng.traineddata',
+      // Then try root paths
+      `${baseUrl}/eng.traineddata`,
+      // Then tessdata subdirectory
+      `${baseUrl}/tessdata/eng.traineddata`,
+    ] : [
+      // Local paths first for main routes
+      `${baseUrl}/eng.traineddata`,
+      `${baseUrl}/tessdata/eng.traineddata`,
+      // Then CDN fallbacks
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+      'https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/eng.traineddata',
+    ];
     
     // Try each source until one works
     for (const source of trainingDataSources) {
@@ -249,6 +235,14 @@ export const downloadTrainingData = async (): Promise<boolean> => {
       } catch (err) {
         console.error(`Error checking training data at ${source}:`, err);
       }
+    }
+    
+    // If on subroute, force GitHub CDN path as fallback
+    if (isOnSubroute) {
+      const githubSourceUrl = 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata';
+      console.log('On subroute, forcing GitHub CDN for training data:', githubSourceUrl);
+      sessionStorage.setItem('ocr-training-data-path', githubSourceUrl);
+      return true;
     }
     
     // GitHub raw content fallback as last resort

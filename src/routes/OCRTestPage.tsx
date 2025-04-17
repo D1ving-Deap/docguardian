@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import OCRTest from '@/components/ocr/OCRTest';
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,18 +15,13 @@ const OCRTestPage: React.FC = () => {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [autoRetryAttempted, setAutoRetryAttempted] = useState(false);
 
-  // Auto-download on first load
+  // Auto-download assets on component mount if we're on a dashboard route
   useEffect(() => {
-    // Check if we're on a route that might cause path issues
-    const isOnSubRoute = window.location.pathname.includes('/dashboard') || 
-                         window.location.pathname.includes('/login');
-                         
-    const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
-    const cachedTrainingPath = sessionStorage.getItem('ocr-training-data-path');
+    const isOnDashboardRoute = window.location.pathname.includes('/dashboard');
+    const needsDownload = isOnDashboardRoute && !autoRetryAttempted;
     
-    // Only auto-download if we're on a subroute and don't have cached files
-    if (isOnSubRoute && (!cachedWasmPath || !cachedTrainingPath) && !autoRetryAttempted) {
-      console.log('Auto-triggering download due to subroute detection:', window.location.pathname);
+    if (needsDownload) {
+      console.log('Auto-triggering download due to dashboard route detection');
       setAutoRetryAttempted(true);
       handleManualDownload();
     }
@@ -71,25 +65,30 @@ const OCRTestPage: React.FC = () => {
           });
         }
       } else {
-        setDiagnosticInfo("Failed to download WASM file. Please try a different browser or check your internet connection.");
-        toast({
-          title: "Download Failed",
-          description: "Could not download required OCR files. Please try a different browser.",
-          variant: "destructive"
-        });
-        
-        // Even after failure, try one more approach - set hardcoded CDN URLs
+        // Even after failure, force CDN paths as a last resort
         sessionStorage.setItem('ocr-wasm-path', 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm');
         sessionStorage.setItem('ocr-training-data-path', 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata');
-        setDiagnosticInfo("Using direct CDN paths as fallback. This may work depending on your browser's CORS policies.");
+        
+        setDiagnosticInfo("Failed to download WASM file but set CDN fallbacks. Please try processing an image now.");
+        setDownloadSuccess(true);
+        toast({
+          title: "Using CDN Fallbacks",
+          description: "Local files not available. Using CDN fallbacks instead. Please try processing an image now.",
+          variant: "default"
+        });
       }
     } catch (error) {
       console.error('Manual download error:', error);
       setDiagnosticInfo(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Force CDN paths as last resort even after error
+      sessionStorage.setItem('ocr-wasm-path', 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm');
+      sessionStorage.setItem('ocr-training-data-path', 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata');
+      
       toast({
-        title: "Download Error",
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: "destructive"
+        title: "Using CDN Fallbacks",
+        description: "Error encountered. Using CDN fallbacks. Please try processing an image now.",
+        variant: "default"
       });
     } finally {
       setDownloading(false);
@@ -230,7 +229,7 @@ User Agent: ${browserInfo.userAgent}
               <h3 className="font-medium text-blue-700">About OCR Testing</h3>
               <p className="text-sm text-blue-600 mt-1">
                 This page allows you to test the OCR functionality using WebAssembly technology. 
-                If you encounter errors, use the "Run Diagnostics" button to check your system compatibility.
+                If you're accessing this from a dashboard route, required assets will be automatically downloaded.
               </p>
               <p className="text-sm text-blue-600 mt-2">
                 For best results:
@@ -238,8 +237,8 @@ User Agent: ${browserInfo.userAgent}
               <ul className="text-sm text-blue-600 list-disc pl-5 mt-1">
                 <li>Use a modern browser (Chrome recommended)</li>
                 <li>Upload clear images with readable text</li>
-                <li>Try JPG or PNG formats for best compatibility</li>
-                <li>If errors persist, try the manual download button below</li>
+                <li>If you encounter errors, click the Manual Download button below</li>
+                <li>Run the diagnostics to check your environment compatibility</li>
               </ul>
               
               <div className="mt-3 space-x-2">
@@ -304,30 +303,26 @@ User Agent: ${browserInfo.userAgent}
           <div className="flex">
             <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-medium text-amber-700">Troubleshooting WebAssembly Issues</h3>
+              <h3 className="font-medium text-amber-700">Troubleshooting Dashboard Routes</h3>
               <p className="text-sm text-amber-600 mt-1">
-                If you see "WebAssembly file is corrupted or missing" errors:
+                When accessing OCR from dashboard routes like /dashboard:
               </p>
               <ol className="text-sm text-amber-600 list-decimal pl-5 mt-1">
-                <li>Click the "Manual Download OCR Assets" button above to fetch WASM files directly</li>
-                <li>Try using a different browser (Chrome works best for WebAssembly)</li>
-                <li>Clear your browser cache and reload the page</li>
-                <li>Make sure you're using a secure connection (HTTPS)</li>
-                <li>Run the diagnostics to identify specific issues</li>
-                <li>If you're on a route like /dashboard, try going to the root path of the site first</li>
+                <li>Assets are automatically downloaded when you load this page</li>
+                <li>CDN sources are used instead of local files to avoid path resolution issues</li>
+                <li>If OCR still fails, click the "Manual Download" button above</li>
+                <li>For persistent issues, try using the OCR Test feature from the root page instead of a nested route</li>
               </ol>
               
               <div className="p-3 bg-white rounded mt-3 border border-amber-200">
                 <h4 className="text-sm font-medium text-amber-800 flex items-center">
                   <FileText className="h-4 w-4 mr-1" />
-                  Common Error Messages
+                  Common Path Issues
                 </h4>
                 <ul className="text-xs text-amber-700 mt-1 space-y-1">
-                  <li><strong>Expected magic word 00 61 73 6d:</strong> The WASM file is corrupted or not downloading properly. Try the Manual Download button.</li>
-                  <li><strong>Invalid WebAssembly file:</strong> The browser cannot load the WASM file. Try a different browser or use Manual Download.</li>
-                  <li><strong>Failed to fetch:</strong> Network error while loading assets. Check your internet connection.</li>
-                  <li><strong>Text recognition model failed to load:</strong> The training data file (eng.traineddata) could not be loaded. Use the Manual Download button.</li>
-                  <li><strong>404 Not Found:</strong> The file path is incorrect. Try the Manual Download button which will try multiple paths.</li>
+                  <li><strong>404 errors:</strong> When accessing from a dashboard route, asset paths may not resolve correctly. The automatic download uses CDN fallbacks to fix this.</li>
+                  <li><strong>CORS issues:</strong> Some CDN paths may be blocked by CORS policies. If this happens, try the "Force Refresh Assets" button which will try multiple sources.</li>
+                  <li><strong>WebAssembly errors:</strong> If you see "Cannot fetch wasm module" errors, click the Manual Download button which creates a Blob URL that bypasses CORS restrictions.</li>
                 </ul>
               </div>
             </div>

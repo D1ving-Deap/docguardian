@@ -1,4 +1,3 @@
-
 import { OCRClient } from 'tesseract-wasm';
 
 /**
@@ -20,24 +19,17 @@ const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
 
 /**
  * Get base URL for the current environment
+ * Handles both development and production environments
  */
 const getBaseUrl = (): string => {
   // Get current domain
   const baseUrl = window.location.origin;
   
-  // Get current path segments to correctly handle subdirectories in deployed apps
-  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  console.log('Current URL:', window.location.href);
+  console.log('Origin:', baseUrl);
+  console.log('Pathname:', window.location.pathname);
   
-  // For routes like /dashboard, we need to ensure we're looking at the root
-  // Remove dashboard or other route names from consideration
-  const validSegments = pathSegments.filter(segment => 
-    !['dashboard', 'login', 'register', 'verify', 'reset'].includes(segment)
-  );
-  
-  const basePath = validSegments.length > 0 ? `/${validSegments[0]}` : '';
-  
-  console.log('Using base URL:', baseUrl, 'with base path:', basePath);
-  return baseUrl + basePath;
+  return baseUrl;
 };
 
 /**
@@ -45,12 +37,12 @@ const getBaseUrl = (): string => {
  * Using multiple potential paths to improve resilience
  */
 export const TESSERACT_CONFIG: TesseractConfig = {
-  // Primary paths - CDN or hosted paths
-  workerPath: `${getBaseUrl()}/tessdata/tesseract-worker.js`, // Try local assets first
-  corePath: `${getBaseUrl()}/tessdata/tesseract-core.wasm`, // Try local assets first
-  trainingDataPath: `${getBaseUrl()}/tessdata/eng.traineddata`, // Local path by default
+  // Primary paths - direct to root, avoiding /assets/ which seems to be causing issues
+  workerPath: `${getBaseUrl()}/tesseract-worker.js`,
+  corePath: `${getBaseUrl()}/tesseract-core.wasm`,
+  trainingDataPath: `${getBaseUrl()}/eng.traineddata`,
   
-  // Fallback paths - CDN and alternate local paths
+  // Fallback paths - CDN and alternate paths (avoiding /assets/ prefix)
   fallbackPaths: {
     workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
     corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
@@ -185,34 +177,56 @@ export const resolveBestPath = async (
     }
   }
 
-  // Try additional paths for deployed environments
-  if (fileType === 'Core WASM' || fileType === 'Training Data') {
-    const baseUrl = window.location.origin;
-    const additionalPaths = [
-      // Main variations
-      `${baseUrl}/tessdata/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
-      `${baseUrl}/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
-      // Asset variations
-      `${baseUrl}/assets/tessdata/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
-      `${baseUrl}/assets/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
-      // Static variations
-      `${baseUrl}/static/tessdata/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
-      `${baseUrl}/static/${fileType === 'Core WASM' ? 'tesseract-core.wasm' : 'eng.traineddata'}`,
-    ];
+  // Additional paths to try for production environments
+  const pathsToTry = [
+    // Public directory roots - first priority
+    `${window.location.origin}/tesseract-worker.js`,
+    `${window.location.origin}/tesseract-core.wasm`,
+    `${window.location.origin}/eng.traineddata`,
     
-    for (const path of additionalPaths) {
+    // Tessdata subdirectory - second priority
+    `${window.location.origin}/tessdata/tesseract-worker.js`,
+    `${window.location.origin}/tessdata/tesseract-core.wasm`,
+    `${window.location.origin}/tessdata/eng.traineddata`,
+    
+    // CDN fallbacks - third priority (use specific versions for stability)
+    'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
+    'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+    'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+    
+    // Alternative CDNs - fourth priority
+    'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
+    'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract-core.wasm'
+  ];
+  
+  // Try each path that's relevant to the current file type
+  for (const path of pathsToTry) {
+    if ((fileType === 'Worker JS' && path.includes('worker')) ||
+        (fileType === 'Core WASM' && path.includes('core')) ||
+        (fileType === 'Training Data' && path.includes('eng.traineddata'))) {
+      
       console.log(`Trying additional path: ${path}`);
       if (await checkFileExists(path)) {
         const isValid = fileType === 'Core WASM' ? await validateWasmFile(path) : true;
-        if (isValid) return { success: true, path };
+        if (isValid) {
+          console.log(`Found valid ${fileType} at: ${path}`);
+          return { success: true, path };
+        }
       }
     }
-    
-    // If we still haven't found it, force use the fallback path even if we couldn't verify it
-    if (fallbackPath) {
-      console.warn(`Forcing use of fallback path: ${fallbackPath}`);
-      return { success: true, path: fallbackPath };
-    }
+  }
+  
+  // Last resort - force use CDN fallbacks
+  if (fallbackPath && fileType === 'Core WASM') {
+    console.warn(`Using fallback path as last resort: ${fallbackPath}`);
+    return { success: true, path: fallbackPath };
+  }
+  
+  if (fileType === 'Training Data') {
+    const trainedDataCDN = 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata';
+    console.warn(`Using CDN for training data as last resort: ${trainedDataCDN}`);
+    return { success: true, path: trainedDataCDN };
   }
 
   return {
@@ -291,6 +305,22 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
  */
 export const createOCRClient = async (options: OCRClientOptions = {}): Promise<OCRClient> => {
   console.log('Initializing OCR client with options:', options);
+
+  // For deployed environments, immediately default to CDN paths if we're on a subroute
+  if (window.location.pathname.includes('/dashboard') || window.location.pathname.includes('/login')) {
+    console.log('Detected subroute, prioritizing CDN paths');
+    
+    // If no explicit paths are set in options, use CDN paths
+    if (!options.corePath) {
+      options.corePath = 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm';
+    }
+    if (!options.trainingDataPath) {
+      options.trainingDataPath = 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata';
+    }
+    if (!options.workerPath) {
+      options.workerPath = 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js';
+    }
+  }
 
   // Check for cached paths from session storage
   const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
