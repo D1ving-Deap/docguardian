@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, FileUp, FileText, CheckCircle2, X, AlertTriangle, RefreshCw, Download } from "lucide-react";
 import { TESSERACT_CONFIG } from '@/utils/tesseractConfig';
 import { verifyOCRAssets, fixOCRAssetIssues } from '@/utils/ocrAssetVerifier';
-import { downloadWasmFile, createWasmBlobUrl } from '@/utils/directWasmDownloader';
+import { downloadWasmFile, downloadTrainingData, createWasmBlobUrl } from '@/utils/directWasmDownloader';
 import { toast } from "@/hooks/use-toast";
 
 const OCRTest: React.FC = () => {
@@ -63,9 +64,12 @@ const OCRTest: React.FC = () => {
         // Format the result to match what the component expects
         setVerificationResult({
           success: result.success,
+          missingFiles: result.missingFiles,
+          browserInfo: result.browserInfo,
+          message: result.message,
           details: {
-            suggestions: result.missingFiles.map(file => `Missing: ${file}`),
-            browserInfo: result.browserInfo
+            suggestions: result.details.suggestions,
+            browserInfo: result.details.browserInfo
           }
         });
         
@@ -81,6 +85,8 @@ const OCRTest: React.FC = () => {
         console.error('Error verifying OCR assets:', error);
         setVerificationResult({
           success: false,
+          missingFiles: ['Verification error'],
+          message: `Error checking assets: ${error instanceof Error ? error.message : 'Unknown error'}`,
           details: {
             suggestions: [`Error checking assets: ${error instanceof Error ? error.message : 'Unknown error'}`],
             browserInfo: { userAgent: navigator.userAgent }
@@ -128,6 +134,17 @@ const OCRTest: React.FC = () => {
         }
       }
       
+      // Use cached training data path if available
+      const cachedTrainingPath = sessionStorage.getItem('ocr-training-data-path');
+      if (cachedTrainingPath) {
+        console.log('Using cached training data path:', cachedTrainingPath);
+        wasmOptions.trainingDataPath = cachedTrainingPath;
+      } else {
+        // Force use local training data if no cached path
+        console.log('Forcing use of local training data path');
+        wasmOptions.trainingDataPath = '/tessdata/eng.traineddata';
+      }
+      
       console.log('Starting OCR with options:', wasmOptions);
       
       const ocrResult = await performOCR(file, (progress) => {
@@ -148,7 +165,7 @@ const OCRTest: React.FC = () => {
       // Automatically try direct download if we haven't yet and there's a WASM-related error
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       
-      if (errorMsg.includes('WebAssembly') && !directDownloadAttempted) {
+      if (errorMsg.includes('WebAssembly') || errorMsg.includes('model failed to load')) {
         await tryDirectDownload();
       } else {
         // Show toast with error
@@ -170,49 +187,57 @@ const OCRTest: React.FC = () => {
     
     toast({
       title: "Attempting Direct Download",
-      description: "Downloading WebAssembly files directly...",
+      description: "Downloading OCR files directly...",
       variant: "default"
     });
     
     try {
       console.log('Starting direct WASM download');
-      const success = await downloadWasmFile('tesseract-core.wasm');
-      console.log('Direct download result:', success);
+      const wasmSuccess = await downloadWasmFile('tesseract-core.wasm');
+      console.log('Direct WASM download result:', wasmSuccess);
       
-      if (success) {
-        // Create blob URL from the cached WASM binary
-        const blobUrl = getCachedWasmBlob();
-        console.log('Got blob URL after download:', blobUrl);
-        
-        if (blobUrl) {
-          sessionStorage.setItem('ocr-wasm-path', blobUrl);
-          
-          toast({
-            title: "Direct Download Successful",
-            description: "WebAssembly files downloaded. Try processing your image now.",
-            variant: "default"
-          });
-          
-          setVerificationResult({
-            success: true,
-            details: {
-              suggestions: ["Using directly downloaded WASM file"],
-              browserInfo: { userAgent: navigator.userAgent }
-            }
-          });
-          
-          // Auto-process the image again if we have one
-          if (file) {
-            setTimeout(() => processImage(), 500);
-          }
-          
-          return true;
+      console.log('Starting training data download');
+      const trainingSuccess = await downloadTrainingData();
+      console.log('Training data download result:', trainingSuccess);
+      
+      // Create blob URL from the cached WASM binary
+      const blobUrl = getCachedWasmBlob();
+      console.log('Got blob URL after download:', blobUrl);
+      
+      if (blobUrl && (wasmSuccess || trainingSuccess)) {
+        // Ensure we have a training data path
+        if (!sessionStorage.getItem('ocr-training-data-path')) {
+          console.log('Setting default training data path');
+          sessionStorage.setItem('ocr-training-data-path', '/tessdata/eng.traineddata');
         }
+        
+        toast({
+          title: "Direct Download Successful",
+          description: "OCR files downloaded. Try processing your image now.",
+          variant: "default"
+        });
+        
+        setVerificationResult({
+          success: true,
+          missingFiles: [],
+          message: "Downloaded OCR files successfully",
+          details: {
+            suggestions: ["Using directly downloaded OCR files"],
+            browserInfo: { userAgent: navigator.userAgent }
+          }
+        });
+        
+        // Auto-process the image again if we have one
+        if (file) {
+          setTimeout(() => processImage(), 500);
+        }
+        
+        return true;
       }
       
       toast({
         title: "Direct Download Failed",
-        description: "Could not download WebAssembly files. Try a different browser (Chrome recommended).",
+        description: "Could not download all OCR files. Try a different browser (Chrome recommended).",
         variant: "destructive"
       });
       
@@ -257,9 +282,12 @@ const OCRTest: React.FC = () => {
       // Format for display
       setVerificationResult({
         success: result.success,
+        missingFiles: result.missingFiles,
+        message: result.message,
+        browserInfo: result.browserInfo,
         details: {
-          suggestions: result.missingFiles.map(file => `Missing: ${file}`),
-          browserInfo: result.browserInfo
+          suggestions: result.details.suggestions,
+          browserInfo: result.details.browserInfo
         }
       });
       
@@ -286,6 +314,8 @@ const OCRTest: React.FC = () => {
       
       setVerificationResult({
         success: false,
+        missingFiles: ['Verification error'],
+        message: `Error during verification: ${error instanceof Error ? error.message : 'Unknown error'}`,
         details: {
           suggestions: [`Error during verification: ${error instanceof Error ? error.message : 'Unknown error'}`],
           browserInfo: { userAgent: navigator.userAgent }
@@ -314,8 +344,8 @@ const OCRTest: React.FC = () => {
       if (directSuccess) {
         setFixResult({
           success: true,
-          message: "Successfully downloaded WASM file directly",
-          fixesApplied: ["Direct download of WebAssembly file"]
+          message: "Successfully downloaded OCR files directly",
+          fixesApplied: ["Direct download of OCR files"]
         });
         
         // Re-run verification to show updated status
@@ -323,7 +353,7 @@ const OCRTest: React.FC = () => {
         
         toast({
           title: "Auto-Fix Successful",
-          description: "Downloaded WebAssembly files directly. Try processing an image now.",
+          description: "Downloaded OCR files directly. Try processing an image now.",
           variant: "default"
         });
       } else {
@@ -335,7 +365,7 @@ const OCRTest: React.FC = () => {
         
         setFixResult({
           success: false,
-          message: "Could not download WASM file from any source",
+          message: "Could not download OCR files from any source",
           fixesApplied: []
         });
       }

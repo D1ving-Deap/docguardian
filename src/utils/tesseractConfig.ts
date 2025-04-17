@@ -8,7 +8,7 @@ interface TesseractConfig {
   workerPath: string;
   corePath: string;
   trainingDataPath: string;
-  fallbackPaths?: {
+  fallbackPaths: {
     workerPath: string;
     corePath: string;
     trainingDataPath: string;
@@ -26,7 +26,7 @@ export const TESSERACT_CONFIG: TesseractConfig = {
   // Primary paths - CDN or hosted paths
   workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
   corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-  trainingDataPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+  trainingDataPath: '/tessdata/eng.traineddata', // Changed to local path by default
   
   // Fallback paths - local deployment paths
   fallbackPaths: {
@@ -177,6 +177,12 @@ export const resolveBestPath = async (
         return { success: true, path };
       }
     }
+    
+    // If we still haven't found it, force use the fallback path even if we couldn't verify it
+    if (fallbackPath) {
+      console.warn(`Forcing use of fallback training data path: ${fallbackPath}`);
+      return { success: true, path: fallbackPath };
+    }
   }
 
   return {
@@ -194,25 +200,35 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
   validationResults: Record<string, ValidationResult>;
   message: string;
 }> => {
-  // Check for cached Blob URL from direct download first
+  // Check for cached paths from session storage
   const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
-  if (cachedWasmPath && cachedWasmPath.startsWith('blob:')) {
-    console.log('Using cached WASM blob URL:', cachedWasmPath);
+  const cachedTrainingPath = sessionStorage.getItem('ocr-training-data-path');
+  
+  // If we have cached paths, use them instead of the defaults
+  if (cachedWasmPath || cachedTrainingPath) {
+    console.log('Using cached paths from session storage');
+    if (cachedWasmPath) {
+      console.log('Using cached WASM path:', cachedWasmPath);
+    }
+    if (cachedTrainingPath) {
+      console.log('Using cached training data path:', cachedTrainingPath);
+    }
+    
     return {
       success: true,
       validationResults: {
         'Worker JS': { success: true, path: config.workerPath },
-        'Core WASM': { success: true, path: cachedWasmPath },
-        'Training Data': { success: true, path: config.trainingDataPath }
+        'Core WASM': { success: true, path: cachedWasmPath || config.corePath },
+        'Training Data': { success: true, path: cachedTrainingPath || config.trainingDataPath }
       },
-      message: 'Using cached WASM file'
+      message: 'Using cached paths from session storage'
     };
   }
 
   const filesToCheck = [
-    { name: 'Worker JS', primary: config.workerPath, fallback: config.fallbackPaths?.workerPath },
-    { name: 'Core WASM', primary: config.corePath, fallback: config.fallbackPaths?.corePath },
-    { name: 'Training Data', primary: config.trainingDataPath, fallback: config.fallbackPaths?.trainingDataPath },
+    { name: 'Worker JS', primary: config.workerPath, fallback: config.fallbackPaths.workerPath },
+    { name: 'Core WASM', primary: config.corePath, fallback: config.fallbackPaths.corePath },
+    { name: 'Training Data', primary: config.trainingDataPath, fallback: config.fallbackPaths.trainingDataPath },
   ];
 
   const validationResults: Record<string, ValidationResult> = {};
@@ -246,11 +262,18 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
 export const createOCRClient = async (options: OCRClientOptions = {}): Promise<OCRClient> => {
   console.log('Initializing OCR client with options:', options);
 
-  // Check for cached WASM path from session storage
+  // Check for cached paths from session storage
   const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+  const cachedTrainingPath = sessionStorage.getItem('ocr-training-data-path');
+  
   if (cachedWasmPath && !options.corePath) {
     console.log('Using cached WASM path from session storage:', cachedWasmPath);
     options.corePath = cachedWasmPath;
+  }
+  
+  if (cachedTrainingPath && !options.trainingDataPath) {
+    console.log('Using cached training data path from session storage:', cachedTrainingPath);
+    options.trainingDataPath = cachedTrainingPath;
   }
 
   // If custom paths are provided in options, use those

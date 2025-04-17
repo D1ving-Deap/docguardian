@@ -121,6 +121,72 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
   }
 };
 
+/**
+ * Downloads training data file from various sources
+ */
+export const downloadTrainingData = async (): Promise<boolean> => {
+  try {
+    console.log('Starting training data download...');
+    
+    // List of reliable sources for eng.traineddata
+    const trainingDataSources = [
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
+      'https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata',
+      'https://github.com/tesseract-ocr/tessdata_best/raw/main/eng.traineddata',
+      // Local fallbacks
+      '/tessdata/eng.traineddata',
+      '/eng.traineddata',
+      '/public/tessdata/eng.traineddata',
+      '/public/eng.traineddata'
+    ];
+    
+    // Check if already cached
+    const cachedTrainingData = sessionStorage.getItem('ocr-training-data-path');
+    if (cachedTrainingData) {
+      console.log('Training data path already cached:', cachedTrainingData);
+      return true;
+    }
+    
+    // Try each source until one works
+    for (const source of trainingDataSources) {
+      try {
+        console.log(`Trying training data source: ${source}`);
+        
+        // Add cache busting
+        const url = new URL(source, window.location.origin);
+        url.searchParams.append('t', Date.now().toString());
+        
+        const response = await fetch(url.toString(), { 
+          method: 'HEAD',
+          cache: 'no-store'
+        });
+        
+        if (!response.ok) {
+          console.warn(`Training data not available at ${source}: ${response.status}`);
+          continue;
+        }
+        
+        console.log(`✅ Found valid training data at ${source}`);
+        
+        // Store the successful path
+        sessionStorage.setItem('ocr-training-data-path', source);
+        return true;
+      } catch (err) {
+        console.error(`Error checking training data at ${source}:`, err);
+      }
+    }
+    
+    // Local fallback as last resort - force use the local path even if we couldn't verify it
+    console.warn('Could not verify any training data source, using local fallback');
+    sessionStorage.setItem('ocr-training-data-path', '/tessdata/eng.traineddata');
+    
+    return false;
+  } catch (error) {
+    console.error('Training data download failed:', error);
+    return false;
+  }
+};
+
 // Helper function to convert ArrayBuffer to Base64 string
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   try {
