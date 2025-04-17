@@ -37,17 +37,9 @@ const getBaseUrl = (): string => {
  * Using multiple potential paths to improve resilience
  */
 export const TESSERACT_CONFIG: TesseractConfig = {
-  // Primary paths - direct to root, avoiding /assets/ which seems to be causing issues
-  workerPath: `${getBaseUrl()}/tesseract-worker.js`,
-  corePath: `${getBaseUrl()}/tesseract-core.wasm`,
-  trainingDataPath: `${getBaseUrl()}/eng.traineddata`,
-  
-  // Fallback paths - CDN and alternate paths (avoiding /assets/ prefix)
-  fallbackPaths: {
-    workerPath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js',
-    corePath: 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-    trainingDataPath: 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
-  },
+  workerPath: `${getBaseUrl()}/tesseract/tesseract-worker.js`,
+  corePath: `${getBaseUrl()}/tesseract/tesseract-core.wasm`,
+  trainingDataPath: `${getBaseUrl()}/tesseract/eng.traineddata`,
 };
 
 /**
