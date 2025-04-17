@@ -1,38 +1,30 @@
-
+// vite.config.ts
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
   },
   plugins: [
     react(),
-    // Conditionally include the componentTagger plugin only in development mode
-    // but import it dynamically to avoid ESM/CJS conflicts
+    // Dynamically load development plugins
     mode === 'development' && {
       name: 'dynamic-tagger',
       async configResolved(config) {
-        // This creates a dynamic import which works with ESM modules
         try {
           const { componentTagger } = await import('lovable-tagger');
           const plugin = componentTagger();
-          // Apply the plugin configuration but don't return anything (void)
-          if (plugin.configResolved) {
-            // Instead of calling directly, we check if it's an object with handler or a function
-            if (typeof plugin.configResolved === 'function') {
-              await plugin.configResolved(config);
-            } else if (plugin.configResolved.handler) {
-              await plugin.configResolved.handler(config);
-            }
+          if (typeof plugin.configResolved === 'function') {
+            await plugin.configResolved(config);
+          } else if (plugin.configResolved?.handler) {
+            await plugin.configResolved.handler(config);
           }
-        } catch (error) {
-          console.warn('Could not load lovable-tagger:', error);
+        } catch (e) {
+          console.warn('Failed to load tagger plugin:', e);
         }
-        // Return void to match the expected return type
       }
     } as Plugin,
   ].filter(Boolean),
@@ -42,10 +34,10 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Ensure WASM files are handled correctly
-    assetsInlineLimit: 0, // Don't inline any assets as base64
+    assetsInlineLimit: 0, // Prevent WASM inlining
   },
+  assetsInclude: ['**/*.wasm'], // ✅ Explicitly include WASM
   optimizeDeps: {
-    exclude: ['tesseract-wasm'], // Exclude tesseract-wasm from dependency optimization
-  }
+    exclude: ['tesseract-wasm'],
+  },
 }));
