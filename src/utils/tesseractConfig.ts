@@ -1,3 +1,4 @@
+
 // src/utils/tesseractConfig.ts
 
 import { OCRClient } from 'tesseract-wasm';
@@ -47,7 +48,8 @@ export const TESSERACT_CONFIG: TesseractConfig = {
 const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
 const validationCache: Record<string, ValidationResult> = {};
 
-const checkFileExists = async (url: string): Promise<boolean> => {
+// Export the function that's being imported in ocrVerification.ts
+export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
     const res = await fetch(url, { method: 'HEAD' });
     return res.ok;
@@ -57,19 +59,37 @@ const checkFileExists = async (url: string): Promise<boolean> => {
   }
 };
 
-const validateWasmFile = async (url: string): Promise<ValidationResult> => {
+// Add the missing function that's being imported in ocrVerification.ts
+export const checkFileWithFallback = async (primaryPath: string, fallbackPath?: string): Promise<{ exists: boolean, path: string }> => {
+  // First check primary path
+  const primaryExists = await checkFileExists(primaryPath);
+  if (primaryExists) {
+    return { exists: true, path: primaryPath };
+  }
+  
+  // If primary doesn't exist but fallback is provided, check fallback
+  if (fallbackPath) {
+    const fallbackExists = await checkFileExists(fallbackPath);
+    if (fallbackExists) {
+      return { exists: true, path: fallbackPath };
+    }
+  }
+  
+  // Neither primary nor fallback exists
+  return { exists: false, path: primaryPath };
+};
+
+export const validateWasmFile = async (url: string): Promise<boolean> => {
   try {
     const res = await fetch(url);
-    if (!res.ok) return { success: false, path: url, error: `HTTP ${res.status}` };
+    if (!res.ok) return false;
 
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    const valid = WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
-    return valid
-      ? { success: true, path: url }
-      : { success: false, path: url, error: 'Invalid WASM header' };
-  } catch (err: any) {
-    return { success: false, path: url, error: err.message };
+    return WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
+  } catch (err) {
+    console.error('WASM validation failed:', url, err);
+    return false;
   }
 };
 
