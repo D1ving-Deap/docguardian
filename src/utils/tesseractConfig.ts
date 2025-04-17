@@ -7,8 +7,8 @@ import { OCRClient } from 'tesseract-wasm';
 interface OCRClientOptions {
   logger?: (message: any) => void;
   progressCallback?: (progress: number) => void;
-  corePath?: string;
-  workerPath?: string;
+  workerPath: '/tessdata/tesseract-worker.js',
+  corePath: '/tessdata/tesseract-core.wasm',
   trainingDataPath?: string;
   language?: string;
 }
