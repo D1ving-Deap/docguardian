@@ -75,16 +75,15 @@ export const useOCRProcessing = ({
       
       // Run OCR on the file with the WASM-based engine
       try {
-        // Run OCR with more detailed progress tracking
-        const ocrResult = await performOCR(
-          file, 
-          (progress) => {
+        // Run OCR with more detailed progress tracking using the proper options object
+        const ocrResult = await performOCR(file, {
+          progressCallback: (progress) => {
             // Scale progress from 10-80%
             const scaledProgress = Math.floor(progress * 70) + 10;
             setProgress(scaledProgress); 
             setProcessingStage(`Processing document: ${Math.floor(progress * 100)}%`);
           }
-        );
+        });
         
         setProcessingStage('Extracting structured data...');
         setProgress(85);

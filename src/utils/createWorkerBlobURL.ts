@@ -1,66 +1,69 @@
 
 /**
- * Creates a blob URL for a worker script
- * @param src Source path for the worker script
- * @returns Promise resolving to the blob URL
+ * Creates a Blob URL for a web worker script, patching any importScripts() calls
+ * to use absolute paths to ensure correct resolution regardless of the page URL.
  */
-export const createWorkerBlobURL = async (src: string): Promise<string> => {
+export const createWorkerBlobURL = async (scriptPath: string): Promise<string> => {
   try {
-    // Check if source is already a blob URL
-    if (src.startsWith('blob:')) {
-      console.log('Worker source is already a blob URL:', src);
-      return src;
-    }
-    
-    // Use absolute path to avoid issues with nested routes
-    let absolutePath = src;
-    if (!src.startsWith('http') && !src.startsWith('blob:')) {
-      const baseOrigin = window.location.origin;
-      absolutePath = src.startsWith('/') 
-        ? `${baseOrigin}${src}` 
-        : `${baseOrigin}/${src}`;
-    }
-
-    console.log(`Fetching worker from: ${absolutePath}`);
-    const response = await fetch(absolutePath);
+    console.log(`Fetching worker script from: ${scriptPath}`);
+    const response = await fetch(scriptPath);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch worker script: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch worker script: ${scriptPath} (${response.status})`);
     }
     
-    const workerText = await response.text();
-    const blob = new Blob([workerText], { type: 'application/javascript' });
-    const blobURL = URL.createObjectURL(blob);
+    const js = await response.text();
+    console.log(`Worker script fetched, length: ${js.length} bytes`);
     
-    console.log(`Worker blob URL created: ${blobURL} (from ${absolutePath})`);
+    // Rewrite importScripts calls to use absolute paths
+    const patched = js.replace(
+      /importScripts\((["'])(.*?)\1\)/g, 
+      (_, quote, src) => {
+        // For .wasm files, always use the absolute path to tessdata directory
+        if (src.includes('.wasm')) {
+          const absolutePath = `${window.location.origin}/tessdata/tesseract-core.wasm`;
+          console.log(`Patching importScripts for WASM: ${src} → ${absolutePath}`);
+          return `importScripts("${absolutePath}")`;
+        }
+        
+        // For other imports, prefix with tessdata if they don't have a full URL
+        if (!src.startsWith('http') && !src.startsWith('/')) {
+          const absolutePath = `${window.location.origin}/tessdata/${src}`;
+          console.log(`Patching importScripts: ${src} → ${absolutePath}`);
+          return `importScripts("${absolutePath}")`;
+        }
+        
+        return `importScripts(${quote}${src}${quote})`;
+      }
+    );
+    
+    // Create blob URL from the patched script
+    const blob = new Blob([patched], { type: 'application/javascript' });
+    const blobURL = URL.createObjectURL(blob);
+    console.log(`Created worker blob URL: ${blobURL}`);
+    
+    // Cache the blob URL in session storage for potential reuse
+    try {
+      sessionStorage.setItem('ocr-worker-blob-url', blobURL);
+      sessionStorage.setItem('ocr-worker-source', scriptPath);
+    } catch (storageError) {
+      console.warn('Failed to cache worker blob URL in session storage:', storageError);
+    }
+    
     return blobURL;
   } catch (error) {
     console.error('Error creating worker blob URL:', error);
-    throw new Error(`Failed to create worker blob URL: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
   }
 };
 
 /**
- * Creates a Tesseract worker from a blob URL
- * @param workerPath Path to the worker script
- * @returns Promise resolving to a Worker instance
+ * Gets a cached worker blob URL if available, or returns null
  */
-export const createTesseractWorker = async (workerPath?: string): Promise<Worker> => {
+export const getCachedWorkerBlobURL = (): string | null => {
   try {
-    const isBlob = workerPath?.startsWith('blob:');
-    
-    // Log for debugging
-    console.log('Worker path type:', isBlob ? 'blob' : 'file path');
-    
-    // If already a blob URL, use it directly, otherwise create one
-    const workerURL = isBlob
-      ? workerPath
-      : await createWorkerBlobURL(workerPath || '/tessdata/tesseract-worker.js');
-    
-    console.log('Creating worker from:', workerURL);
-    return new Worker(workerURL);
-  } catch (error) {
-    console.error('Error creating tesseract worker:', error);
-    throw new Error(`Failed to create tesseract worker: ${error instanceof Error ? error.message : String(error)}`);
+    return sessionStorage.getItem('ocr-worker-blob-url');
+  } catch {
+    return null;
   }
 };

@@ -68,13 +68,12 @@ const DocumentUpload = ({
       
       setProcessingStatus('Reading document text...');
       
-      // Use the WASM-based OCR engine with progress callback as separate param
-      const result = await performOCR(
-        file, 
-        (progress) => {
+      // Use the WASM-based OCR engine with proper options object
+      const result = await performOCR(file, {
+        progressCallback: (progress) => {
           setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
         }
-      );
+      });
       
       setProcessingStatus('Extracting data from text...');
       
