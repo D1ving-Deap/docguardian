@@ -1,6 +1,5 @@
 
 import { OCRClient } from 'tesseract-wasm';
-import { createTesseractWorker } from './createTesseractWorker';
 
 /** OCR Client configuration options */
 interface OCRClientOptions {
@@ -18,6 +17,12 @@ interface ValidationResult {
   path: string;
   error?: string;
   label?: string;
+}
+
+/** File check result */
+interface FileCheckResult {
+  exists: boolean;
+  path: string;
 }
 
 /** Tesseract config interface */
@@ -40,9 +45,9 @@ export const TESSERACT_CONFIG: TesseractConfig = {
   corePath: `${BASE_PATH}/tesseract-core.wasm`,
   trainingDataPath: `${BASE_PATH}/eng.traineddata`,
   fallbackPaths: {
-    workerPath: 'https://your-cdn.com/tesseract-worker.js',
-    corePath: 'https://your-cdn.com/tesseract-core.wasm',
-    trainingDataPath: 'https://your-cdn.com/eng.traineddata',
+    workerPath: undefined,
+    corePath: undefined,
+    trainingDataPath: undefined,
   }
 };
 
@@ -51,41 +56,44 @@ const validationCache: Record<string, ValidationResult> = {};
 
 export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
-    const res = await fetch(url, { method: 'HEAD' });
+    // Use absolute URL resolution to avoid path issues with nested routes
+    let absoluteUrl = url;
+    if (!url.startsWith('http') && !url.startsWith('blob:')) {
+      // Make path absolute if it's not already
+      const baseOrigin = window.location.origin;
+      absoluteUrl = url.startsWith('/') 
+        ? `${baseOrigin}${url}` 
+        : `${baseOrigin}/${url}`;
+    }
+    
+    console.log(`Checking if file exists: ${absoluteUrl}`);
+    const res = await fetch(absoluteUrl, { method: 'HEAD' });
     return res.ok;
   } catch {
     return false;
   }
 };
 
-/**
- * Check file existence with fallback
- */
 export const checkFileWithFallback = async (
   primaryPath: string,
   fallbackPath?: string
-): Promise<{ exists: boolean; path: string }> => {
-  // Try primary path first
-  try {
-    const primaryExists = await checkFileExists(primaryPath);
-    if (primaryExists) {
-      return { exists: true, path: primaryPath };
-    }
-    
-    // If primary fails and fallback exists, try fallback
-    if (fallbackPath) {
-      const fallbackExists = await checkFileExists(fallbackPath);
-      if (fallbackExists) {
-        return { exists: true, path: fallbackPath };
-      }
-    }
-    
-    // Nothing worked
-    return { exists: false, path: primaryPath };
-  } catch (error) {
-    console.error(`Error checking file ${primaryPath}:`, error);
-    return { exists: false, path: primaryPath };
+): Promise<FileCheckResult> => {
+  // First try primary path
+  const primaryExists = await checkFileExists(primaryPath);
+  if (primaryExists) {
+    return { exists: true, path: primaryPath };
   }
+  
+  // If fallback path is provided, try that next
+  if (fallbackPath) {
+    const fallbackExists = await checkFileExists(fallbackPath);
+    if (fallbackExists) {
+      return { exists: true, path: fallbackPath };
+    }
+  }
+  
+  // If we get here, neither path worked
+  return { exists: false, path: primaryPath };
 };
 
 export const validateWasmFile = async (url: string): Promise<ValidationResult> => {
@@ -171,42 +179,15 @@ export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG)
 };
 
 export const createOCRClient = async (options: OCRClientOptions = {}): Promise<OCRClient> => {
-  console.log('Creating OCR client with options:', options);
-  
   const { validationResults, success } = await verifyOCRFiles(TESSERACT_CONFIG);
-  if (!success) {
-    console.error('OCR setup failed. Assets missing or invalid:', validationResults);
-    throw new Error('OCR setup failed. Assets missing or invalid.');
-  }
+  if (!success) throw new Error('OCR setup failed. Assets missing or invalid.');
 
-  try {
-    // Create worker using the blob-based approach
-    console.log('Creating Tesseract worker using blob-based approach');
-    const worker = await createTesseractWorker(options.workerPath || validationResults.worker.path);
-    console.log('Tesseract worker created successfully');
-    
-    // Get custom paths or use validated paths
-    const corePath = options.corePath || validationResults.wasm.path;
-    const trainingDataPath = options.trainingDataPath || validationResults.trained.path;
-    
-    console.log('Initializing OCR client with paths:', {
-      corePath,
-      trainingDataPath
-    });
-    
-    const client = new OCRClient({
-      worker,
-      corePath,
-      logger: options.logger,
-    });
+  const client = new OCRClient({
+    workerPath: options.workerPath || validationResults.worker.path,
+    corePath: options.corePath || validationResults.wasm.path,
+    logger: options.logger,
+  });
 
-    console.log('Loading OCR model...');
-    await client.loadModel(trainingDataPath, options.progressCallback);
-    console.log('OCR model loaded successfully');
-    
-    return client;
-  } catch (error) {
-    console.error('Failed to create OCR client:', error);
-    throw new Error(`OCR initialization failed: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  await client.loadModel(options.trainingDataPath || validationResults.trained.path, options.progressCallback);
+  return client;
 };
