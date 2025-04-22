@@ -7,6 +7,7 @@ import { Loader2, FileUp, FileText, CheckCircle2, X, AlertTriangle, RefreshCw, D
 import { TESSERACT_CONFIG } from '@/utils/tesseractConfig';
 import { downloadWasmFile, downloadTrainingData, createWasmBlobUrl } from '@/utils/directWasmDownloader';
 import { toast } from "@/hooks/use-toast";
+import { verifyOCRAssets } from '@/utils/ocrVerification';
 
 const OCRTest: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);

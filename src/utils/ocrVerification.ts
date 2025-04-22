@@ -1,3 +1,4 @@
+
 import { TESSERACT_CONFIG, checkFileExists, checkFileWithFallback, validateWasmFile } from './tesseractConfig';
 
 /**
@@ -14,6 +15,7 @@ export const verifyOCRAssets = async (): Promise<{
     trainingDataPath: string;
   };
   browserInfo?: any;
+  details: any;
 }> => {
   console.log('Verifying OCR assets...');
   
@@ -37,7 +39,11 @@ export const verifyOCRAssets = async (): Promise<{
       success: false,
       missingFiles: ['WebAssembly Support'],
       message: 'Your browser does not support WebAssembly, which is required for OCR',
-      browserInfo
+      browserInfo,
+      details: {
+        suggestions: ['Your browser does not support WebAssembly. Please use a modern browser like Chrome, Firefox, Edge, or Safari.'],
+        browserInfo
+      }
     };
   }
   
@@ -54,7 +60,11 @@ export const verifyOCRAssets = async (): Promise<{
         corePath: cachedWasmPath,
         trainingDataPath: TESSERACT_CONFIG.trainingDataPath
       },
-      browserInfo
+      browserInfo,
+      details: {
+        suggestions: ["Using cached WASM file from browser session"],
+        browserInfo
+      }
     };
   }
   
@@ -117,7 +127,14 @@ export const verifyOCRAssets = async (): Promise<{
       missingFiles,
       message: `Missing OCR files: ${missingFiles.join(', ')}`,
       workingPaths,
-      browserInfo
+      browserInfo,
+      details: {
+        suggestions: [
+          "Some OCR assets couldn't be found. Try running auto-fix or manual download.",
+          "If issues persist, try using a different browser like Chrome."
+        ],
+        browserInfo
+      }
     };
   }
   
@@ -126,7 +143,11 @@ export const verifyOCRAssets = async (): Promise<{
     missingFiles: [],
     message: 'All OCR files verified successfully',
     workingPaths,
-    browserInfo
+    browserInfo,
+    details: {
+      suggestions: ["All OCR files verified successfully"],
+      browserInfo
+    }
   };
 };
 
