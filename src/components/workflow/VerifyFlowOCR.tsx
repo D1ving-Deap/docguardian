@@ -1,4 +1,5 @@
 
+// This is a partial update to fix the OCR function calls
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

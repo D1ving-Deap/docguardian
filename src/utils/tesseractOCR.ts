@@ -58,6 +58,8 @@ export const performOCR = async (
 
   try {
     const logger = options.logger || console.log;
+    const progressCallback = options.progressCallback;
+    
     logger('🔍 Starting OCR processing...');
 
     // Create worker blob URL for the worker script
@@ -85,7 +87,7 @@ export const performOCR = async (
       logger,
     });
 
-    await ocrClient.loadModel(trainingDataPath, options.progressCallback);
+    await ocrClient.loadModel(trainingDataPath, progressCallback);
     logger('✅ Model loaded successfully.');
 
     // Step 2: Convert file to image

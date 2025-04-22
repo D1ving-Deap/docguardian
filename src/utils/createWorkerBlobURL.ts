@@ -12,7 +12,7 @@ export const createWorkerBlobURL = async (src: string): Promise<string> => {
       return src;
     }
     
-    // Use absolute path to avoid issues with nested routes
+    // Always use absolute path to avoid issues with nested routes
     let absolutePath = src;
     if (!src.startsWith('http') && !src.startsWith('blob:')) {
       const baseOrigin = window.location.origin;
@@ -47,13 +47,8 @@ export const createWorkerBlobURL = async (src: string): Promise<string> => {
  */
 export const createTesseractWorker = async (workerPath?: string): Promise<Worker> => {
   try {
-    const isBlob = workerPath?.startsWith('blob:');
-    
-    // Log for debugging
-    console.log('Worker path type:', isBlob ? 'blob' : 'file path');
-    
     // If already a blob URL, use it directly, otherwise create one
-    const workerURL = isBlob
+    const workerURL = workerPath?.startsWith('blob:')
       ? workerPath
       : await createWorkerBlobURL(workerPath || '/tessdata/tesseract-worker.js');
     
