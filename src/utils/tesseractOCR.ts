@@ -4,7 +4,7 @@ import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
 import { TESSERACT_CONFIG } from './tesseractConfig';
-import { createWorkerBlobURL, createTesseractWorker } from './createWorkerBlobURL';
+import { createWorkerBlobURL, createTesseractWorker, resolveWasmUrl } from './createWorkerBlobURL';
 
 export interface OCROptions {
   progressCallback?: (progress: number) => void;
@@ -21,9 +21,11 @@ const checkAsset = async (url: string): Promise<boolean> => {
     let absoluteUrl = url;
     if (!url.startsWith('http') && !url.startsWith('blob:')) {
       const baseOrigin = window.location.origin;
+      const basePath = import.meta.env.BASE_URL || '/';
+      
       absoluteUrl = url.startsWith('/') 
         ? `${baseOrigin}${url}` 
-        : `${baseOrigin}/${url}`;
+        : `${baseOrigin}${basePath}${url}`;
     }
     
     console.log(`Checking asset at: ${absoluteUrl}`);
@@ -43,6 +45,28 @@ const resolveAssetPath = async (
   if (await checkAsset(primary)) return primary;
   if (fallback && await checkAsset(fallback)) return fallback;
 
+  // Look for the file in alternative locations
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const fileName = primary.split('/').pop();
+  
+  if (fileName) {
+    const alternativePaths = [
+      `/tessdata/${fileName}`,
+      `${baseUrl}tessdata/${fileName}`,
+      `/assets/${fileName}`,
+      `${baseUrl}assets/${fileName}`,
+      `/${fileName}`,
+      `${baseUrl}${fileName}`
+    ];
+    
+    for (const path of alternativePaths) {
+      if (await checkAsset(path)) {
+        console.log(`Found ${label} at alternative location: ${path}`);
+        return path;
+      }
+    }
+  }
+
   throw new Error(
     `${label} not found or unreachable.\nTried:\n→ ${primary}\n→ ${fallback || 'N/A'}`
   );
@@ -55,11 +79,17 @@ export const verifyOCRAssets = async (): Promise<{
   message?: string;
 }> => {
   try {
+    // Try to resolve the actual paths first
+    const resolvedWorkerPath = await resolveWasmUrl(TESSERACT_CONFIG.workerPath);
+    const resolvedCorePath = await resolveWasmUrl(TESSERACT_CONFIG.corePath);
+    
     const assets = {
-      workerJs: await checkAsset(TESSERACT_CONFIG.workerPath),
-      coreWasm: await checkAsset(TESSERACT_CONFIG.corePath),
+      workerJs: await checkAsset(resolvedWorkerPath || TESSERACT_CONFIG.workerPath),
+      coreWasm: await checkAsset(resolvedCorePath || TESSERACT_CONFIG.corePath),
       trainedData: await checkAsset(TESSERACT_CONFIG.trainingDataPath)
     };
+    
+    console.log("Asset verification results:", assets);
     
     if (Object.values(assets).every(status => status)) {
       return { status: 'success', assets };
@@ -80,6 +110,26 @@ export const verifyOCRAssets = async (): Promise<{
   }
 };
 
+// Try to load the WASM file using the URL import approach (Vite specific)
+const getWasmUrl = async (): Promise<string> => {
+  try {
+    // First check if we have a cached URL in session storage
+    const cachedWasmPath = sessionStorage.getItem('ocr-wasm-path');
+    if (cachedWasmPath && cachedWasmPath.startsWith('blob:')) {
+      console.log('Using cached WASM blob URL:', cachedWasmPath);
+      return cachedWasmPath;
+    }
+    
+    // Try to resolve the WASM file URL
+    const wasmUrl = await resolveWasmUrl(TESSERACT_CONFIG.corePath);
+    console.log('Resolved WASM URL:', wasmUrl);
+    return wasmUrl;
+  } catch (error) {
+    console.error('Error getting WASM URL:', error);
+    throw error;
+  }
+};
+
 /** Perform OCR and return extracted text + confidence */
 export const performOCR = async (
   file: File | Blob,
@@ -90,7 +140,7 @@ export const performOCR = async (
 
   try {
     const logger = options.logger || console.log;
-    const progressCallback = options.progressCallback;
+    const progressCallback = options.progressCallback || (() => {});
     
     logger('🔍 Starting OCR processing...');
 
@@ -98,28 +148,31 @@ export const performOCR = async (
     workerBlobURL = await createWorkerBlobURL(options.workerPath || TESSERACT_CONFIG.workerPath);
     logger(`⚙️ Created worker blob URL: ${workerBlobURL}`);
 
-    // Resolve asset paths with fallback
-    const corePath = options.corePath || await resolveAssetPath(
-      'Core WASM',
-      TESSERACT_CONFIG.corePath,
-      TESSERACT_CONFIG.fallbackPaths?.corePath
-    );
+    // Get WASM file URL using Vite's direct URL import approach
+    const wasmUrl = options.corePath || await getWasmUrl();
+    logger(`⚙️ Using WASM URL: ${wasmUrl}`);
     
+    // Resolve training data path
     const trainingDataPath = options.trainingDataPath || await resolveAssetPath(
       'Training Data',
       TESSERACT_CONFIG.trainingDataPath,
       TESSERACT_CONFIG.fallbackPaths?.trainingDataPath
     );
+    logger(`⚙️ Using training data path: ${trainingDataPath}`);
 
-    // Step 1: Initialize OCR client
+    // Step 1: Initialize OCR client with resolved paths
     logger('⚙️ Initializing OCR Client...');
     ocrClient = new OCRClient({
-      corePath,
+      corePath: wasmUrl,
       workerPath: workerBlobURL,
       logger,
     });
 
-    await ocrClient.loadModel(trainingDataPath, progressCallback);
+    // Load the OCR model with progress tracking
+    await ocrClient.loadModel(trainingDataPath, (progress) => {
+      logger(`Model loading progress: ${Math.round(progress * 100)}%`);
+      progressCallback(progress);
+    });
     logger('✅ Model loaded successfully.');
 
     // Step 2: Convert file to image

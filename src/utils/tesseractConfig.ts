@@ -1,4 +1,3 @@
-
 import { OCRClient } from 'tesseract-wasm';
 
 /** OCR Client configuration options */
@@ -40,14 +39,26 @@ interface TesseractConfig {
 // Configurable base path (can also be set via .env if needed)
 const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '/tessdata';
 
+// For Vite handling of import.meta.url with assets
+const getAssetUrl = (relativePath) => {
+  try {
+    // Try dynamic import URL approach (only works in Vite in some contexts)
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    return new URL(`${baseUrl}${relativePath}`, window.location.origin).href;
+  } catch (e) {
+    // Fallback to normal path
+    return `${BASE_PATH}/${relativePath}`;
+  }
+};
+
 export const TESSERACT_CONFIG: TesseractConfig = {
   workerPath: `${BASE_PATH}/tesseract-worker.js`,
   corePath: `${BASE_PATH}/tesseract-core.wasm`,
   trainingDataPath: `${BASE_PATH}/eng.traineddata`,
   fallbackPaths: {
-    workerPath: undefined,
-    corePath: undefined,
-    trainingDataPath: undefined,
+    workerPath: '/assets/tesseract-worker.js',
+    corePath: '/assets/tesseract-core.wasm',
+    trainingDataPath: '/eng.traineddata',
   }
 };
 

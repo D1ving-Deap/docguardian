@@ -6,10 +6,12 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
   try {
     console.log('Starting direct WASM download process for:', destination);
     const baseUrl = window.location.origin;
+    const basePath = import.meta.env.BASE_URL || '/';
     
     // Log important information for debugging
     console.log('Current URL:', window.location.href);
     console.log('Base URL:', baseUrl);
+    console.log('Base Path:', basePath);
     console.log('Path:', window.location.pathname);
     
     // Check if we're on a subroute in production (especially dashboard)
@@ -31,24 +33,27 @@ export const downloadWasmFile = async (destination: string): Promise<boolean> =>
       return true;
     }
     
-    // For deployed sites, prioritize CDN sources to avoid path issues
-    const wasmSources = isOnSubroute ? [
-      // CDN sources first for subroutes
-      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      // Then try root paths
-      `${baseUrl}/tesseract-core.wasm`,
-      // Then tessdata subdirectory
+    // For deployed sites, prioritize all possible sources
+    // The order is important - try local files first, then CDN
+    const wasmSources = [
+      // 1. Try standard paths
+      `${baseUrl}${basePath}tessdata/tesseract-core.wasm`,
       `${baseUrl}/tessdata/tesseract-core.wasm`,
-    ] : [
-      // Root paths first for main routes
+      // 2. Try assets directory
+      `${baseUrl}${basePath}assets/tesseract-core.wasm`,
+      `${baseUrl}/assets/tesseract-core.wasm`,
+      // 3. Try root directory
+      `${baseUrl}${basePath}tesseract-core.wasm`,
       `${baseUrl}/tesseract-core.wasm`,
-      // Tessdata subdirectory second
-      `${baseUrl}/tessdata/tesseract-core.wasm`,
-      // Then CDN sources
+      // 4. CDN fallbacks
       'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
       'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
     ];
+    
+    // If in development, also try direct node_modules access
+    if (import.meta.env.DEV) {
+      wasmSources.unshift(`${baseUrl}/node_modules/tesseract-wasm/dist/tesseract-core.wasm`);
+    }
     
     // Try each source until one works
     for (const source of wasmSources) {
