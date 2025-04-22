@@ -15,6 +15,16 @@ import type {
   IssueSeverity
 } from './types/ocrTypes';
 
+/**
+ * Document analysis result interface
+ */
+export interface DocumentAnalysisResult {
+  documentId: string;
+  text: string;
+  extractedFields: ExtractedFields;
+  issues: DocumentIssue[];
+}
+
 // Re-export types
 export type {
   OCRResult,
@@ -29,6 +39,6 @@ export type {
 // Re-export implementation functions
 export {
   performOCR,
-  extractFieldsFromText,
+  extractFieldsFromText as extractFields,
   analyzeForIssues
 };

@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, X, Loader2, Upload, CheckCircle2 } from "lucide-react";
 import { supabase, supabaseUrl } from "@/integrations/supabase/client";
 import storage from '@/utils/supabaseStorage';
-import { performOCR, extractFieldsFromText } from '@/utils/ocrService';
+import { performOCR, OCROptions } from '@/utils/tesseractOCR';
+import { extractFields } from '@/utils/ocrService';
 
 interface DocumentUploadProps {
   label: string;
@@ -58,35 +58,40 @@ const DocumentUpload = ({
     }
   };
   
-  const extractTextWithTesseract = async (imageUrl: string): Promise<{ text: string, extractedFields?: any }> => {
-    setProcessingStatus('Initializing OCR engine...');
+const extractTextWithTesseract = async (imageUrl: string): Promise<{ text: string, extractedFields?: any }> => {
+  setProcessingStatus('Initializing OCR engine...');
+  
+  try {
+    // Convert URL to File object for processing
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const file = new File([blob], 'document.png', { type: blob.type });
     
-    try {
-      // Convert URL to File object for processing
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'document.png', { type: blob.type });
-      
-      setProcessingStatus('Reading document text...');
-      
-      // Use the WASM-based OCR engine
-      const result = await performOCR(file, (progress) => {
+    setProcessingStatus('Reading document text...');
+    
+    // Use the WASM-based OCR engine
+    const ocrOptions: OCROptions = {
+      progressCallback: (progress) => {
         setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
-      });
-      
-      setProcessingStatus('Extracting data from text...');
-      
-      const extractedFields = extractFieldsFromText(result.text, documentType);
-      
-      return { 
-        text: result.text,
-        extractedFields
-      };
-    } catch (error) {
-      console.error('OCR error:', error);
-      throw new Error('Failed to extract text from document');
-    }
-  };
+      },
+      logger: console.log
+    };
+    
+    const result = await performOCR(file, ocrOptions);
+    
+    setProcessingStatus('Extracting data from text...');
+    
+    const extractedFields = extractFields(result.text, documentType);
+    
+    return { 
+      text: result.text,
+      extractedFields
+    };
+  } catch (error) {
+    console.error('OCR error:', error);
+    throw new Error('Failed to extract text from document');
+  }
+};
   
   const extractFieldsFromText = (text: string, docType: string): any => {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);

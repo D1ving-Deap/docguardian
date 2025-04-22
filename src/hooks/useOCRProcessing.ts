@@ -1,7 +1,7 @@
+
 import { useState, useCallback } from 'react';
 import { performOCR } from '@/utils/tesseractOCR';
-import { extractFields } from '@/utils/ocrService';
-import { DocumentAnalysisResult, ExtractedFields } from '@/utils/ocrService';
+import { extractFields, DocumentAnalysisResult, ExtractedFields } from '@/utils/ocrService';
 
 interface OCRProcessingConfig {
   applicationId?: string;
@@ -48,7 +48,7 @@ export const useOCRProcessing = (config: OCRProcessingConfig) => {
       setProcessingStage('analyzing');
       setProgress(70);
       
-      const extractedFields: ExtractedFields = await extractFields(ocrResult.text, config.documentType);
+      const extractedFields: ExtractedFields = await extractFields(ocrResult.text, config.documentType || 'generic');
       setProgress(85);
       
       // Step 3: Validate and analyze the extracted data
@@ -60,7 +60,7 @@ export const useOCRProcessing = (config: OCRProcessingConfig) => {
       
       // Simulate issues detection
       const issues = [];
-      if (extractedFields && extractedFields.name && extractedFields.name.length < 3) {
+      if (extractedFields && typeof extractedFields.name === 'string' && extractedFields.name.length < 3) {
         issues.push({ severity: 'warning', message: 'Name is too short' });
       }
       

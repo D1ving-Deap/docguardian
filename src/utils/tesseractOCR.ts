@@ -6,7 +6,7 @@ import { OCRResult } from './types/ocrTypes';
 import { TESSERACT_CONFIG } from './tesseractConfig';
 import { createWorkerBlobURL, createTesseractWorker } from './createWorkerBlobURL';
 
-interface OCROptions {
+export interface OCROptions {
   progressCallback?: (progress: number) => void;
   logger?: (message: any) => void;
   corePath?: string;
@@ -46,6 +46,38 @@ const resolveAssetPath = async (
   throw new Error(
     `${label} not found or unreachable.\nTried:\n→ ${primary}\n→ ${fallback || 'N/A'}`
   );
+};
+
+/** Verify that OCR assets are available and accessible */
+export const verifyOCRAssets = async (): Promise<{
+  status: 'success' | 'error';
+  assets: { [key: string]: boolean };
+  message?: string;
+}> => {
+  try {
+    const assets = {
+      workerJs: await checkAsset(TESSERACT_CONFIG.workerPath),
+      coreWasm: await checkAsset(TESSERACT_CONFIG.corePath),
+      trainedData: await checkAsset(TESSERACT_CONFIG.trainingDataPath)
+    };
+    
+    if (Object.values(assets).every(status => status)) {
+      return { status: 'success', assets };
+    } else {
+      return { 
+        status: 'error', 
+        assets,
+        message: 'Some OCR assets could not be loaded. Check console for details.' 
+      };
+    }
+  } catch (error) {
+    console.error('Error verifying OCR assets:', error);
+    return { 
+      status: 'error', 
+      assets: { workerJs: false, coreWasm: false, trainedData: false },
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
 };
 
 /** Perform OCR and return extracted text + confidence */
