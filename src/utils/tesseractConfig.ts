@@ -1,4 +1,6 @@
+
 import { OCRClient } from 'tesseract-wasm';
+import { normalizePath } from './pathUtils';
 
 /** OCR Client configuration options */
 interface OCRClientOptions {
@@ -29,10 +31,10 @@ interface TesseractConfig {
   workerPath: string;
   corePath: string;
   trainingDataPath: string;
-  fallbackPaths?: {
-    workerPath?: string[];
-    corePath?: string[];
-    trainingDataPath?: string[];
+  fallbackPaths: {
+    workerPath: string[];
+    corePath: string[];
+    trainingDataPath: string[];
   };
 }
 
@@ -73,9 +75,6 @@ export const TESSERACT_CONFIG: TesseractConfig = {
     ]
   }
 };
-
-const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
-const validationCache: Record<string, ValidationResult> = {};
 
 export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
@@ -126,6 +125,7 @@ export const validateWasmFile = async (url: string): Promise<ValidationResult> =
 
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
+    const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
     const valid = WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
     return valid
       ? { success: true, path: url }
@@ -153,6 +153,8 @@ const resolveBestPath = async (
   fallbacks?: string[],
   validateWasm = false
 ): Promise<ValidationResult> => {
+  const validationCache: Record<string, ValidationResult> = {};
+  
   if (validationCache[primary]) return { ...validationCache[primary], label };
 
   const validate = label.includes('WASM')

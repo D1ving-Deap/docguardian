@@ -1,4 +1,6 @@
+
 import { TESSERACT_CONFIG, checkFileExists, validateWasmFile } from './tesseractConfig';
+import { normalizePath } from './pathUtils';
 
 /**
  * Performs comprehensive verification of OCR assets and provides detailed diagnostic information
@@ -47,9 +49,9 @@ export const verifyOCRAssets = async (): Promise<{
     { name: 'worker', path: TESSERACT_CONFIG.workerPath },
     { name: 'wasm', path: TESSERACT_CONFIG.corePath },
     { name: 'training', path: TESSERACT_CONFIG.trainingDataPath },
-    { name: 'worker-fallback', path: TESSERACT_CONFIG.fallbackPaths.workerPath },
-    { name: 'wasm-fallback', path: TESSERACT_CONFIG.fallbackPaths.corePath },
-    { name: 'training-fallback', path: TESSERACT_CONFIG.fallbackPaths.trainingDataPath }
+    { name: 'worker-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.workerPath || '') },
+    { name: 'wasm-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.corePath || '') },
+    { name: 'training-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.trainingDataPath || '') }
   ];
   
   const fileStatus: Record<string, any> = {};

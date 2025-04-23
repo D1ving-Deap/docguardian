@@ -1,5 +1,6 @@
 
 import { TESSERACT_CONFIG, checkFileExists, checkFileWithFallback, validateWasmFile } from './tesseractConfig';
+import { normalizePath } from './pathUtils';
 
 /**
  * Verifies that all required OCR WASM assets are available
@@ -72,17 +73,17 @@ export const verifyOCRAssets = async (): Promise<{
     { 
       name: 'Worker JS', 
       primaryPath: TESSERACT_CONFIG.workerPath, 
-      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.workerPath 
+      fallbackPath: normalizePath(TESSERACT_CONFIG.fallbackPaths?.workerPath || '')
     },
     { 
       name: 'Core WASM', 
       primaryPath: TESSERACT_CONFIG.corePath, 
-      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.corePath 
+      fallbackPath: normalizePath(TESSERACT_CONFIG.fallbackPaths?.corePath || '')
     },
     { 
       name: 'Training Data', 
       primaryPath: TESSERACT_CONFIG.trainingDataPath, 
-      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.trainingDataPath 
+      fallbackPath: normalizePath(TESSERACT_CONFIG.fallbackPaths?.trainingDataPath || '')
     }
   ];
   
@@ -215,13 +216,19 @@ export const diagnoseOCRIssues = async (): Promise<{
     { path: TESSERACT_CONFIG.workerPath, name: 'worker' },
     { path: TESSERACT_CONFIG.corePath, name: 'wasm' },
     { path: TESSERACT_CONFIG.trainingDataPath, name: 'traindata' },
-    { path: TESSERACT_CONFIG.fallbackPaths.workerPath, name: 'worker-fallback' },
-    { path: TESSERACT_CONFIG.fallbackPaths.corePath, name: 'wasm-fallback' },
-    { path: TESSERACT_CONFIG.fallbackPaths.trainingDataPath, name: 'traindata-fallback' }
+    { path: normalizePath(TESSERACT_CONFIG.fallbackPaths.workerPath || ''), name: 'worker-fallback' },
+    { path: normalizePath(TESSERACT_CONFIG.fallbackPaths.corePath || ''), name: 'wasm-fallback' },
+    { path: normalizePath(TESSERACT_CONFIG.fallbackPaths.trainingDataPath || ''), name: 'traindata-fallback' }
   ];
   
   for (const file of filesToCheck) {
     try {
+      // Skip empty paths
+      if (!file.path) {
+        diagnosis.filesAccessible[file.name] = false;
+        continue;
+      }
+      
       const response = await fetch(file.path, { method: 'HEAD' });
       const exists = response.ok;
       diagnosis.filesAccessible[file.name] = exists;
