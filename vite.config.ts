@@ -100,7 +100,7 @@ export default defineConfig(({ mode }) => ({
     // Special plugin to handle WASM imports
     {
       name: 'wasm-import-handler',
-      load(id) {
+      load(id: string) {
         if (id.endsWith('.wasm')) {
           // Generate a virtual module that loads the WASM file
           const wasmPath = id.replace(/^.*[\\\/]/, '');
