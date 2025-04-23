@@ -1,9 +1,10 @@
-import { defineConfig, Plugin } from "vite";
+
+import { defineConfig, Plugin, ConfigEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from 'fs';
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }: ConfigEnv) => ({
   server: {
     host: "0.0.0.0",
     port: 8080,
@@ -35,7 +36,7 @@ export default defineConfig(({ mode }) => ({
     // Enhanced WASM file copying plugin
     {
       name: 'wasm-file-handler',
-      apply: 'build',
+      apply: 'build' as const, // Use type assertion to fix the error
       async buildStart() {
         // Copy files to both /assets/ and /tessdata/ for maximum compatibility
         const publicDir = path.resolve(__dirname, 'public');
@@ -69,8 +70,8 @@ export default defineConfig(({ mode }) => ({
           }
         }
       }
-    }
-  ].filter(Boolean),
+    } as Plugin
+  ].filter(Boolean) as Plugin[],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
