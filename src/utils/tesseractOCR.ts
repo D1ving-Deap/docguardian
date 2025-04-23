@@ -4,7 +4,7 @@ import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
 import { TESSERACT_CONFIG } from './tesseractConfig';
-import { createWorkerBlobURL, resolveWasmUrl } from './createWorkerBlobURL';
+import { createWorkerBlobURL, resolveWasmUrl } from './directWasmDownloader';
 import { normalizePath } from './pathUtils';
 
 export interface OCROptions {
