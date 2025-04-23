@@ -68,34 +68,21 @@ export const verifyOCRAssets = async (): Promise<{
     };
   }
   
-  // Modified to handle fallback paths correctly
   const filesToCheck = [
     { 
       name: 'Worker JS', 
       primaryPath: TESSERACT_CONFIG.workerPath, 
-      // Fix - Use first item from array or empty string
-      fallbackPath: Array.isArray(TESSERACT_CONFIG.fallbackPaths?.workerPath) ? 
-                    TESSERACT_CONFIG.fallbackPaths?.workerPath[0] : 
-                    typeof TESSERACT_CONFIG.fallbackPaths?.workerPath === 'string' ?
-                    TESSERACT_CONFIG.fallbackPaths?.workerPath : ''
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.workerPath 
     },
     { 
       name: 'Core WASM', 
       primaryPath: TESSERACT_CONFIG.corePath, 
-      // Fix - Use first item from array or empty string
-      fallbackPath: Array.isArray(TESSERACT_CONFIG.fallbackPaths?.corePath) ? 
-                    TESSERACT_CONFIG.fallbackPaths?.corePath[0] : 
-                    typeof TESSERACT_CONFIG.fallbackPaths?.corePath === 'string' ?
-                    TESSERACT_CONFIG.fallbackPaths?.corePath : ''
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.corePath 
     },
     { 
       name: 'Training Data', 
       primaryPath: TESSERACT_CONFIG.trainingDataPath, 
-      // Fix - Use first item from array or empty string
-      fallbackPath: Array.isArray(TESSERACT_CONFIG.fallbackPaths?.trainingDataPath) ? 
-                    TESSERACT_CONFIG.fallbackPaths?.trainingDataPath[0] : 
-                    typeof TESSERACT_CONFIG.fallbackPaths?.trainingDataPath === 'string' ?
-                    TESSERACT_CONFIG.fallbackPaths?.trainingDataPath : ''
+      fallbackPath: TESSERACT_CONFIG.fallbackPaths?.trainingDataPath 
     }
   ];
   
@@ -112,7 +99,6 @@ export const verifyOCRAssets = async (): Promise<{
   
   for (const file of filesToCheck) {
     try {
-      // Only pass a string to checkFileWithFallback, not an array
       const result = await checkFileWithFallback(file.primaryPath, file.fallbackPath);
       if (!result.exists) {
         missingFiles.push(file.name);
@@ -224,30 +210,17 @@ export const diagnoseOCRIssues = async (): Promise<{
     diagnosis.suggestions.push('Your browser may not support SharedArrayBuffer, which can affect WASM performance.');
   }
   
-  // Fix access to fallbackPaths to ensure we're only using strings
-  const getFirstPathOrDefault = (pathObj?: string | string[]): string => {
-    if (typeof pathObj === 'string') return pathObj;
-    if (Array.isArray(pathObj) && pathObj.length > 0) return pathObj[0];
-    return '';
-  };
-  
-  // Check accessibility of required files with corrected type handling
+  // Check accessibility of required files
   const filesToCheck = [
     { path: TESSERACT_CONFIG.workerPath, name: 'worker' },
     { path: TESSERACT_CONFIG.corePath, name: 'wasm' },
     { path: TESSERACT_CONFIG.trainingDataPath, name: 'traindata' },
-    { path: getFirstPathOrDefault(TESSERACT_CONFIG.fallbackPaths?.workerPath), name: 'worker-fallback' },
-    { path: getFirstPathOrDefault(TESSERACT_CONFIG.fallbackPaths?.corePath), name: 'wasm-fallback' },
-    { path: getFirstPathOrDefault(TESSERACT_CONFIG.fallbackPaths?.trainingDataPath), name: 'traindata-fallback' }
+    { path: TESSERACT_CONFIG.fallbackPaths.workerPath, name: 'worker-fallback' },
+    { path: TESSERACT_CONFIG.fallbackPaths.corePath, name: 'wasm-fallback' },
+    { path: TESSERACT_CONFIG.fallbackPaths.trainingDataPath, name: 'traindata-fallback' }
   ];
   
   for (const file of filesToCheck) {
-    if (!file.path) {
-      diagnosis.filesAccessible[file.name] = false;
-      diagnosis.suggestions.push(`The ${file.name} fallback path is not configured`);
-      continue;
-    }
-    
     try {
       const response = await fetch(file.path, { method: 'HEAD' });
       const exists = response.ok;

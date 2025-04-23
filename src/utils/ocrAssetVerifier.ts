@@ -1,4 +1,3 @@
-
 import { TESSERACT_CONFIG, checkFileExists, validateWasmFile } from './tesseractConfig';
 
 /**
@@ -48,10 +47,9 @@ export const verifyOCRAssets = async (): Promise<{
     { name: 'worker', path: TESSERACT_CONFIG.workerPath },
     { name: 'wasm', path: TESSERACT_CONFIG.corePath },
     { name: 'training', path: TESSERACT_CONFIG.trainingDataPath },
-    // Fix these three lines to handle array types properly
-    { name: 'worker-fallback', path: TESSERACT_CONFIG.fallbackPaths?.workerPath?.[0] || '' },
-    { name: 'wasm-fallback', path: TESSERACT_CONFIG.fallbackPaths?.corePath?.[0] || '' },
-    { name: 'training-fallback', path: TESSERACT_CONFIG.fallbackPaths?.trainingDataPath?.[0] || '' }
+    { name: 'worker-fallback', path: TESSERACT_CONFIG.fallbackPaths.workerPath },
+    { name: 'wasm-fallback', path: TESSERACT_CONFIG.fallbackPaths.corePath },
+    { name: 'training-fallback', path: TESSERACT_CONFIG.fallbackPaths.trainingDataPath }
   ];
   
   const fileStatus: Record<string, any> = {};
