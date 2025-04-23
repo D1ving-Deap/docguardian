@@ -98,7 +98,7 @@ export const checkFileExists = async (url: string): Promise<boolean> => {
 
 export const checkFileWithFallback = async (
   primaryPath: string,
-  fallbackPath?: string
+  fallbackPath?: string | string[]
 ): Promise<FileCheckResult> => {
   // First try primary path
   const primaryExists = await checkFileExists(primaryPath);
@@ -108,9 +108,14 @@ export const checkFileWithFallback = async (
   
   // If fallback path is provided, try that next
   if (fallbackPath) {
-    const fallbackExists = await checkFileExists(fallbackPath);
-    if (fallbackExists) {
-      return { exists: true, path: fallbackPath };
+    // Handle array or string fallback paths
+    const fallbackPaths = Array.isArray(fallbackPath) ? fallbackPath : [fallbackPath];
+    
+    for (const path of fallbackPaths) {
+      const fallbackExists = await checkFileExists(path);
+      if (fallbackExists) {
+        return { exists: true, path };
+      }
     }
   }
   

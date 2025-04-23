@@ -49,9 +49,9 @@ export const verifyOCRAssets = async (): Promise<{
     { name: 'worker', path: TESSERACT_CONFIG.workerPath },
     { name: 'wasm', path: TESSERACT_CONFIG.corePath },
     { name: 'training', path: TESSERACT_CONFIG.trainingDataPath },
-    { name: 'worker-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.workerPath || '') },
-    { name: 'wasm-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.corePath || '') },
-    { name: 'training-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.trainingDataPath || '') }
+    { name: 'worker-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.workerPath) },
+    { name: 'wasm-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.corePath) },
+    { name: 'training-fallback', path: normalizePath(TESSERACT_CONFIG.fallbackPaths.trainingDataPath) }
   ];
   
   const fileStatus: Record<string, any> = {};
@@ -81,9 +81,9 @@ export const verifyOCRAssets = async (): Promise<{
       if (file.name === 'wasm' || file.name === 'wasm-fallback') {
         console.log(`Validating WASM file ${file.path}...`);
         const isValid = await validateWasmFile(file.path);
-        fileStatus[file.name].valid = isValid;
+        fileStatus[file.name].valid = isValid.success;
         
-        if (!isValid) {
+        if (!isValid.success) {
           console.error(`❌ ${file.name} is not a valid WASM file!`);
           overallSuccess = overallSuccess && false;
           missingFiles.push(`${file.name} (invalid)`);

@@ -1,9 +1,11 @@
+
 // src/utils/tesseractOCR.ts
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
 import { TESSERACT_CONFIG } from './tesseractConfig';
 import { createWorkerBlobURL, resolveWasmUrl } from './createWorkerBlobURL';
+import { normalizePath } from './pathUtils';
 
 export interface OCROptions {
   progressCallback?: (progress: number) => void;
@@ -39,10 +41,21 @@ const checkAsset = async (url: string): Promise<boolean> => {
 const resolveAssetPath = async (
   label: string,
   primary: string,
-  fallback?: string
+  fallback?: string | string[]
 ): Promise<string> => {
   if (await checkAsset(primary)) return primary;
-  if (fallback && await checkAsset(fallback)) return fallback;
+  
+  // Handle string or array fallback
+  if (fallback) {
+    if (Array.isArray(fallback)) {
+      // Try each fallback in the array
+      for (const path of fallback) {
+        if (await checkAsset(path)) return path;
+      }
+    } else if (await checkAsset(fallback)) {
+      return fallback;
+    }
+  }
 
   // Look for the file in alternative locations
   const baseUrl = import.meta.env.BASE_URL || '/';
@@ -67,7 +80,9 @@ const resolveAssetPath = async (
   }
 
   throw new Error(
-    `${label} not found or unreachable.\nTried:\n→ ${primary}\n→ ${fallback || 'N/A'}`
+    `${label} not found or unreachable.\nTried:\n→ ${primary}\n→ ${
+      Array.isArray(fallback) ? fallback.join('\n→ ') : fallback || 'N/A'
+    }`
   );
 };
 
@@ -169,7 +184,8 @@ export const performOCR = async (
     logger('🔍 Starting OCR processing...');
 
     // Create worker blob URL for the worker script
-    workerBlobURL = await createWorkerBlobURL(options.workerPath || TESSERACT_CONFIG.workerPath);
+    const workerPath = options.workerPath || TESSERACT_CONFIG.workerPath;
+    workerBlobURL = await createWorkerBlobURL(normalizePath(workerPath));
     logger(`⚙️ Created worker blob URL: ${workerBlobURL}`);
 
     // Try different approaches to get the WASM URL
@@ -177,8 +193,10 @@ export const performOCR = async (
     if (!wasmUrl) {
       try {
         // Try to get the WASM URL using standard URL approach for Vite
+        // Use absolute paths to avoid nested route issues
+        const baseOrigin = window.location.origin;
         const basePath = '/tessdata/tesseract-core.wasm';
-        const resolvedUrl = new URL(basePath, window.location.origin).href;
+        const resolvedUrl = new URL(basePath, baseOrigin).href;
         logger(`⚙️ Using resolved URL: ${resolvedUrl}`);
         wasmUrl = resolvedUrl;
       } catch (error) {
