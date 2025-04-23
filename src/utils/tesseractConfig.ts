@@ -30,35 +30,47 @@ interface TesseractConfig {
   corePath: string;
   trainingDataPath: string;
   fallbackPaths?: {
-    workerPath?: string;
-    corePath?: string;
-    trainingDataPath?: string;
+    workerPath?: string[];
+    corePath?: string[];
+    trainingDataPath?: string[];
   };
 }
 
-// Configurable base path (can also be set via .env if needed)
-const BASE_PATH = import.meta.env.VITE_TESSERACT_BASE_PATH || '/tessdata';
-
 // For Vite handling of import.meta.url with assets
-const getAssetUrl = (relativePath) => {
+const getAssetUrl = (relativePath: string): string => {
   try {
     // Try dynamic import URL approach (only works in Vite in some contexts)
     const baseUrl = import.meta.env.BASE_URL || '/';
     return new URL(`${baseUrl}${relativePath}`, window.location.origin).href;
   } catch (e) {
     // Fallback to normal path
-    return `${BASE_PATH}/${relativePath}`;
+    return `/${relativePath}`;
   }
 };
 
 export const TESSERACT_CONFIG: TesseractConfig = {
-  workerPath: `${BASE_PATH}/tesseract-worker.js`,
-  corePath: `${BASE_PATH}/tesseract-core.wasm`,
-  trainingDataPath: `${BASE_PATH}/eng.traineddata`,
+  workerPath: `/tessdata/tesseract-worker.js`,
+  corePath: `/tessdata/tesseract-core.wasm`,
+  trainingDataPath: `/tessdata/eng.traineddata`,
   fallbackPaths: {
-    workerPath: '/assets/tesseract-worker.js',
-    corePath: '/assets/tesseract-core.wasm',
-    trainingDataPath: '/eng.traineddata',
+    // Multiple fallback paths in order of preference
+    workerPath: [
+      '/tessdata/tesseract-worker.js',
+      '/tesseract-worker.js',
+      '/assets/tesseract-worker.js',
+      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-worker.js'
+    ],
+    corePath: [
+      '/tessdata/tesseract-core.wasm',
+      '/tesseract-core.wasm',
+      '/assets/tesseract-core.wasm',
+      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm'
+    ],
+    trainingDataPath: [
+      '/tessdata/eng.traineddata',
+      '/eng.traineddata',
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata'
+    ]
   }
 };
 
@@ -138,7 +150,7 @@ export const validateTrainingData = async (url: string): Promise<ValidationResul
 const resolveBestPath = async (
   label: string,
   primary: string,
-  fallback?: string,
+  fallbacks?: string[],
   validateWasm = false
 ): Promise<ValidationResult> => {
   if (validationCache[primary]) return { ...validationCache[primary], label };
@@ -153,11 +165,15 @@ const resolveBestPath = async (
     return validationCache[primary];
   }
 
-  if (fallback) {
-    const fallbackValid = await validate(fallback);
-    if (fallbackValid.success) {
-      validationCache[primary] = { ...fallbackValid, label };
-      return validationCache[primary];
+  if (fallbacks && fallbacks.length > 0) {
+    // Try each fallback in sequence
+    for (const fallback of fallbacks) {
+      const fallbackValid = await validate(fallback);
+      if (fallbackValid.success) {
+        validationCache[primary] = { ...fallbackValid, label, path: fallback };
+        console.log(`Using fallback path for ${label}: ${fallback}`);
+        return validationCache[primary];
+      }
     }
   }
 
@@ -165,11 +181,12 @@ const resolveBestPath = async (
     success: false,
     path: primary,
     label,
-    error: `Failed to load ${label}. Tried: ${primary}, fallback: ${fallback || 'none'}`,
+    error: `Failed to load ${label}. Tried: ${primary}, fallbacks: ${fallbacks?.join(', ') || 'none'}`,
   };
 };
 
 export const verifyOCRFiles = async (config: TesseractConfig = TESSERACT_CONFIG) => {
+  // Try with multiple fallbacks
   const [worker, wasm, trained] = await Promise.all([
     resolveBestPath('Worker JS', config.workerPath, config.fallbackPaths?.workerPath),
     resolveBestPath('Core WASM', config.corePath, config.fallbackPaths?.corePath, true),

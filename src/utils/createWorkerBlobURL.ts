@@ -1,4 +1,3 @@
-
 /**
  * Creates a blob URL for a worker script
  * @param src Source path for the worker script

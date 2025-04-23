@@ -1,10 +1,9 @@
-
 // src/utils/tesseractOCR.ts
 import { OCRClient } from 'tesseract-wasm';
 import { createOCRClient } from './tesseractConfig';
 import { OCRResult } from './types/ocrTypes';
 import { TESSERACT_CONFIG } from './tesseractConfig';
-import { createWorkerBlobURL, createTesseractWorker, resolveWasmUrl } from './createWorkerBlobURL';
+import { createWorkerBlobURL, resolveWasmUrl } from './createWorkerBlobURL';
 
 export interface OCROptions {
   progressCallback?: (progress: number) => void;
@@ -73,39 +72,64 @@ const resolveAssetPath = async (
 };
 
 /** Verify that OCR assets are available and accessible */
-export const verifyOCRAssets = async (): Promise<{
-  status: 'success' | 'error';
-  assets: { [key: string]: boolean };
-  message?: string;
-}> => {
+export const verifyOCRAssets = async () => {
   try {
-    // Try to resolve the actual paths first
-    const resolvedWorkerPath = await resolveWasmUrl(TESSERACT_CONFIG.workerPath);
-    const resolvedCorePath = await resolveWasmUrl(TESSERACT_CONFIG.corePath);
-    
-    const assets = {
-      workerJs: await checkAsset(resolvedWorkerPath || TESSERACT_CONFIG.workerPath),
-      coreWasm: await checkAsset(resolvedCorePath || TESSERACT_CONFIG.corePath),
-      trainedData: await checkAsset(TESSERACT_CONFIG.trainingDataPath)
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const userAgent = navigator.userAgent;
+    const details = {
+      suggestions: [] as string[],
+      browserInfo: {
+        userAgent,
+        isChrome: userAgent.includes('Chrome'),
+        isSafari: userAgent.includes('Safari') && !userAgent.includes('Chrome')
+      }
     };
     
-    console.log("Asset verification results:", assets);
+    // Check primary files
+    const workerPath = `/tessdata/tesseract-worker.js`;
+    const wasmPath = `/tessdata/tesseract-core.wasm`;
+    const trainingPath = `/tessdata/eng.traineddata`;
+
+    // Check all paths
+    const checkWorker = await fetch(workerPath, { method: 'HEAD' }).catch(() => ({ ok: false }));
+    const checkWasm = await fetch(wasmPath, { method: 'HEAD' }).catch(() => ({ ok: false }));
+    const checkTraining = await fetch(trainingPath, { method: 'HEAD' }).catch(() => ({ ok: false }));
     
-    if (Object.values(assets).every(status => status)) {
-      return { status: 'success', assets };
-    } else {
-      return { 
-        status: 'error', 
-        assets,
-        message: 'Some OCR assets could not be loaded. Check console for details.' 
-      };
+    const missingFiles = [];
+    if (!checkWorker.ok) missingFiles.push('Worker JS');
+    if (!checkWasm.ok) missingFiles.push('WASM Core');
+    if (!checkTraining.ok) missingFiles.push('Training Data');
+    
+    // Add suggestions based on issues
+    if (missingFiles.length > 0) {
+      details.suggestions.push(`Missing files: ${missingFiles.join(', ')}`);
+      details.suggestions.push('Try running the manual asset copy script');
+      
+      if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+        details.suggestions.push('Safari has limited WASM support - try Chrome');
+      }
     }
+    
+    return {
+      success: checkWorker.ok && checkWasm.ok && checkTraining.ok,
+      missingFiles,
+      message: missingFiles.length > 0 
+        ? `Missing OCR assets: ${missingFiles.join(', ')}` 
+        : 'All OCR assets verified',
+      browserInfo: { userAgent },
+      details
+    };
   } catch (error) {
     console.error('Error verifying OCR assets:', error);
-    return { 
-      status: 'error', 
-      assets: { workerJs: false, coreWasm: false, trainedData: false },
-      message: error instanceof Error ? error.message : String(error)
+    return {
+      success: false,
+      missingFiles: ['Verification error'],
+      message: error instanceof Error ? error.message : 'Unknown error',
+      browserInfo: { userAgent: navigator.userAgent },
+      details: {
+        suggestions: ['Error during verification', 'Try running the manual copy script'],
+        browserInfo: { userAgent: navigator.userAgent }
+      }
     };
   }
 };
@@ -148,16 +172,27 @@ export const performOCR = async (
     workerBlobURL = await createWorkerBlobURL(options.workerPath || TESSERACT_CONFIG.workerPath);
     logger(`⚙️ Created worker blob URL: ${workerBlobURL}`);
 
-    // Get WASM file URL using Vite's direct URL import approach
-    const wasmUrl = options.corePath || await getWasmUrl();
+    // Try different approaches to get the WASM URL
+    let wasmUrl = options.corePath;
+    if (!wasmUrl) {
+      try {
+        // Try to get the WASM URL using standard URL approach for Vite
+        const basePath = '/tessdata/tesseract-core.wasm';
+        const resolvedUrl = new URL(basePath, window.location.origin).href;
+        logger(`⚙️ Using resolved URL: ${resolvedUrl}`);
+        wasmUrl = resolvedUrl;
+      } catch (error) {
+        logger('Error creating URL:', error);
+        // Fallback to resolveWasmUrl function
+        wasmUrl = await resolveWasmUrl();
+      }
+    }
+    
     logger(`⚙️ Using WASM URL: ${wasmUrl}`);
     
     // Resolve training data path
-    const trainingDataPath = options.trainingDataPath || await resolveAssetPath(
-      'Training Data',
-      TESSERACT_CONFIG.trainingDataPath,
-      TESSERACT_CONFIG.fallbackPaths?.trainingDataPath
-    );
+    const trainingDataPath = options.trainingDataPath || 
+      new URL('/tessdata/eng.traineddata', window.location.origin).href;
     logger(`⚙️ Using training data path: ${trainingDataPath}`);
 
     // Step 1: Initialize OCR client with resolved paths
