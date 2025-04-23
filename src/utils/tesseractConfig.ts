@@ -1,6 +1,5 @@
-
 import { OCRClient } from 'tesseract-wasm';
-import { normalizePath } from './pathUtils';
+import { normalizePath, createAbsoluteUrl } from './pathUtils';
 
 /** OCR Client configuration options */
 interface OCRClientOptions {
@@ -79,14 +78,7 @@ export const TESSERACT_CONFIG: TesseractConfig = {
 export const checkFileExists = async (url: string): Promise<boolean> => {
   try {
     // Use absolute URL resolution to avoid path issues with nested routes
-    let absoluteUrl = url;
-    if (!url.startsWith('http') && !url.startsWith('blob:')) {
-      // Make path absolute if it's not already
-      const baseOrigin = window.location.origin;
-      absoluteUrl = url.startsWith('/') 
-        ? `${baseOrigin}${url}` 
-        : `${baseOrigin}/${url}`;
-    }
+    let absoluteUrl = createAbsoluteUrl(url);
     
     console.log(`Checking if file exists: ${absoluteUrl}`);
     const res = await fetch(absoluteUrl, { method: 'HEAD' });
@@ -125,18 +117,78 @@ export const checkFileWithFallback = async (
 
 export const validateWasmFile = async (url: string): Promise<ValidationResult> => {
   try {
-    const res = await fetch(url);
-    if (!res.ok) return { success: false, path: url, error: `HTTP ${res.status}` };
+    // First check if the URL is accessible
+    const absoluteUrl = createAbsoluteUrl(url);
+    console.log(`Validating WASM at ${absoluteUrl}`);
+    
+    const res = await fetch(absoluteUrl);
+    if (!res.ok) return { 
+      success: false, 
+      path: url, 
+      error: `HTTP ${res.status}`,
+      label: 'WASM validation'
+    };
+
+    // Check content type
+    const contentType = res.headers.get('content-type');
+    if (contentType && 
+        !contentType.includes('application/wasm') && 
+        !contentType.includes('application/octet-stream') &&
+        !contentType.includes('binary/octet-stream')) {
+      console.warn(`Warning: WASM file has unexpected content type: ${contentType}`);
+    }
 
     const buf = await res.arrayBuffer();
+    if (!buf || buf.byteLength < 8) {
+      return { 
+        success: false, 
+        path: url, 
+        error: `Invalid response size: ${buf?.byteLength || 0} bytes`,
+        label: 'WASM validation'
+      };
+    }
+
     const bytes = new Uint8Array(buf);
+    
+    // Log first few bytes for debugging
+    console.log(`First 8 bytes: ${Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+    
+    // Check for WASM magic bytes
     const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
-    const valid = WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
-    return valid
-      ? { success: true, path: url }
-      : { success: false, path: url, error: 'Invalid WASM header' };
+    const valid = bytes.length >= WASM_MAGIC_BYTES.length && 
+                  WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
+    
+    if (!valid) {
+      // If first bytes look like HTML or text, indicate that
+      const possibleText = String.fromCharCode(...bytes.slice(0, 20));
+      let errorMsg = 'Invalid WASM header';
+      
+      if (possibleText.includes('<!DOCTYPE') || 
+          possibleText.includes('<html') || 
+          possibleText.includes('<?xml')) {
+        errorMsg = 'Received HTML instead of WASM binary. Possible 404 page or CORS issue.';
+      }
+      
+      return { 
+        success: false, 
+        path: url, 
+        error: errorMsg,
+        label: 'WASM validation'
+      };
+    }
+    
+    return { 
+      success: true, 
+      path: url,
+      label: 'WASM validation'
+    };
   } catch (err: any) {
-    return { success: false, path: url, error: err.message };
+    return { 
+      success: false, 
+      path: url, 
+      error: err.message,
+      label: 'WASM validation'
+    };
   }
 };
 
@@ -217,12 +269,41 @@ export const createOCRClient = async (options: OCRClientOptions = {}): Promise<O
   const { validationResults, success } = await verifyOCRFiles(TESSERACT_CONFIG);
   if (!success) throw new Error('OCR setup failed. Assets missing or invalid.');
 
-  const client = new OCRClient({
-    workerPath: options.workerPath || validationResults.worker.path,
-    corePath: options.corePath || validationResults.wasm.path,
-    logger: options.logger,
+  // Create a specific logger that includes file paths for debugging
+  const enhancedLogger = options.logger || ((msg: any) => {
+    console.log(`OCR Client: ${JSON.stringify(msg)}`);
   });
 
-  await client.loadModel(options.trainingDataPath || validationResults.trained.path, options.progressCallback);
-  return client;
+  console.log(`Creating OCR client with paths:
+- Worker: ${options.workerPath || validationResults.worker.path}
+- WASM: ${options.corePath || validationResults.wasm.path}
+- Training: ${options.trainingDataPath || validationResults.trained.path}`);
+
+  try {
+    const client = new OCRClient({
+      workerPath: options.workerPath || validationResults.worker.path,
+      corePath: options.corePath || validationResults.wasm.path,
+      logger: enhancedLogger,
+    });
+
+    await client.loadModel(
+      options.trainingDataPath || validationResults.trained.path, 
+      options.progressCallback
+    );
+    return client;
+  } catch (error) {
+    console.error('Failed to create OCR client:', error);
+    
+    // Give more specific error message
+    if (error instanceof Error) {
+      if (error.message.includes('compile') || error.message.includes('instantiate')) {
+        throw new Error(`WASM compilation failed: ${error.message}. The WASM file may be corrupted or incorrectly served.`);
+      }
+      if (error.message.includes('Failed to fetch')) {
+        throw new Error(`Failed to fetch OCR resources: ${error.message}. Check network connectivity and CORS settings.`);
+      }
+    }
+    
+    throw error;
+  }
 };

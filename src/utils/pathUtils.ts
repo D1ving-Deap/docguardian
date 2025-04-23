@@ -1,30 +1,40 @@
 
 /**
- * Utility functions for handling paths and URLs
+ * Utility functions for path handling and normalization
  */
 
 /**
- * Ensures a path is a string, taking the first element if it's an array
+ * Normalizes a path that could be either a string or string array to a single string path
  */
-export function normalizePath(path: string | string[]): string {
-  return Array.isArray(path) ? path[0] : path;
-}
+export const normalizePath = (path: string | string[]): string => {
+  if (Array.isArray(path)) {
+    return path[0] || ''; // Return first element or empty string
+  }
+  return path;
+};
 
 /**
- * Normalizes all paths in a fallback path configuration
+ * Creates an absolute URL for an asset path
  */
-export function normalizeFallbackPaths(paths: {
-  workerPath?: string | string[];
-  corePath?: string | string[];
-  trainingDataPath?: string | string[];
-}): {
-  workerPath?: string;
-  corePath?: string;
-  trainingDataPath?: string;
-} {
-  return {
-    workerPath: paths.workerPath ? normalizePath(paths.workerPath) : undefined,
-    corePath: paths.corePath ? normalizePath(paths.corePath) : undefined,
-    trainingDataPath: paths.trainingDataPath ? normalizePath(paths.trainingDataPath) : undefined
-  };
-}
+export const createAbsoluteUrl = (path: string): string => {
+  if (path.startsWith('http') || path.startsWith('blob:')) {
+    return path;
+  }
+  
+  const baseOrigin = window.location.origin;
+  return path.startsWith('/') 
+    ? `${baseOrigin}${path}` 
+    : `${baseOrigin}/${path}`;
+};
+
+/**
+ * Determines if a URL is external (not on the same origin)
+ */
+export const isExternalUrl = (url: string): boolean => {
+  try {
+    const urlObj = new URL(url, window.location.origin);
+    return urlObj.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+};

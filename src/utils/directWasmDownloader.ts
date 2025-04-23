@@ -1,328 +1,198 @@
 
 /**
- * Direct WASM downloader utility to fetch WebAssembly files from trusted sources
+ * Utilities for directly downloading WASM files to overcome CORS and path issues
  */
-export const downloadWasmFile = async (destination: string): Promise<boolean> => {
+
+import { normalizePath, createAbsoluteUrl } from './pathUtils';
+
+// Check if in browser environment
+const isBrowser = typeof window !== 'undefined';
+
+/**
+ * Directly download and store a WASM file in the browser to work around CORS issues
+ */
+export const downloadWasmFile = async (filename: string): Promise<boolean> => {
+  if (!isBrowser) return false;
+
   try {
-    console.log('Starting direct WASM download process for:', destination);
-    const baseUrl = window.location.origin;
-    const basePath = import.meta.env.BASE_URL || '/';
-    
-    // Log important information for debugging
-    console.log('Current URL:', window.location.href);
-    console.log('Base URL:', baseUrl);
-    console.log('Base Path:', basePath);
-    console.log('Path:', window.location.pathname);
-    
-    // Check if we're on a subroute in production (especially dashboard)
-    const isOnSubroute = window.location.pathname.includes('/dashboard') || 
-                        window.location.pathname.includes('/login');
-    
-    console.log('Is on subroute:', isOnSubroute);
-    
-    // Check if the WASM file is already cached
-    const cachedFile = sessionStorage.getItem('ocr-wasm-binary');
-    if (cachedFile) {
-      console.log('WASM file already cached in session storage');
-      return true;
-    }
-    
-    const cachedPath = sessionStorage.getItem('ocr-wasm-path');
-    if (cachedPath && cachedPath.startsWith('blob:')) {
-      console.log('WASM blob URL already cached:', cachedPath);
-      return true;
-    }
-    
-    // For deployed sites, prioritize all possible sources
-    // The order is important - try local files first, then CDN
-    const wasmSources = [
-      // 1. Try standard paths
-      `${baseUrl}${basePath}tessdata/tesseract-core.wasm`,
-      `${baseUrl}/tessdata/tesseract-core.wasm`,
-      // 2. Try assets directory
-      `${baseUrl}${basePath}assets/tesseract-core.wasm`,
-      `${baseUrl}/assets/tesseract-core.wasm`,
-      // 3. Try root directory
-      `${baseUrl}${basePath}tesseract-core.wasm`,
-      `${baseUrl}/tesseract-core.wasm`,
-      // 4. CDN fallbacks
-      'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
-      'https://cdn.jsdelivr.net/npm/tesseract-wasm@0.10.0/dist/tesseract-core.wasm',
+    console.log(`Attempting to download WASM file: ${filename}`);
+    const sources = [
+      `/tessdata/${filename}`,
+      `/${filename}`,
+      `/assets/${filename}`,
+      `https://unpkg.com/tesseract-wasm@0.10.0/dist/${filename}`
     ];
-    
-    // If in development, also try direct node_modules access
-    if (import.meta.env.DEV) {
-      wasmSources.unshift(`${baseUrl}/node_modules/tesseract-wasm/dist/tesseract-core.wasm`);
-    }
-    
-    // Try each source until one works
-    for (const source of wasmSources) {
+
+    // Track the source for debugging
+    let sourceUsed = '';
+
+    // Try each source
+    for (const source of sources) {
       try {
-        console.log(`Attempting download from ${source}...`);
+        console.log(`Trying source: ${source}`);
+        const absoluteUrl = createAbsoluteUrl(source);
         
-        // Add a cache-busting parameter to avoid cached responses
-        const url = new URL(source);
-        url.searchParams.append('t', Date.now().toString());
-        
-        console.log(`Fetching from URL: ${url.toString()}`);
-        
-        const response = await fetch(url.toString(), { 
-          method: 'GET',
+        // Use arraybuffer to ensure we get binary data, not text
+        const response = await fetch(absoluteUrl, { 
           cache: 'no-cache',
-          credentials: 'omit',
-          headers: {
-            'Accept': 'application/wasm,*/*'
-          }
+          headers: { 'Accept': 'application/octet-stream' }
         });
         
         if (!response.ok) {
-          console.warn(`Failed to download from ${source}: ${response.status} ${response.statusText}`);
+          console.warn(`Failed to fetch from ${absoluteUrl}: ${response.status}`);
           continue;
         }
-        
-        // Get the binary data
+
+        // Get binary data
         const arrayBuffer = await response.arrayBuffer();
+        
+        // Validate WASM magic bytes
         const bytes = new Uint8Array(arrayBuffer);
+        const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
         
-        console.log(`Downloaded ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB from ${source}`);
+        const isValidWasm = bytes.length >= WASM_MAGIC_BYTES.length && 
+                           WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
         
-        // Verify that this is actually a valid WASM file (check magic bytes)
-        if (bytes.length < 4 || 
-            bytes[0] !== 0x00 || 
-            bytes[1] !== 0x61 || 
-            bytes[2] !== 0x73 || 
-            bytes[3] !== 0x6D) {
-          console.warn(`Invalid WASM file from ${source}. Header: ${
-            bytes[0].toString(16).padStart(2, '0')} ${
-            bytes[1].toString(16).padStart(2, '0')} ${
-            bytes[2].toString(16).padStart(2, '0')} ${
-            bytes[3].toString(16).padStart(2, '0')}`);
-            
-          // If it looks like an HTML error page, log the beginning
-          if (bytes[0] === 0x3C) { // '<'
-            const decoder = new TextDecoder();
-            console.warn('Response appears to be HTML, not WASM:', decoder.decode(bytes.slice(0, 100)));
-          }
-          
+        if (!isValidWasm) {
+          console.warn(`Invalid WASM file from ${absoluteUrl}. First bytes:`, 
+            Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' '));
           continue;
         }
+
+        // Create blob URL
+        const blob = new Blob([arrayBuffer], { type: 'application/wasm' });
+        const blobUrl = URL.createObjectURL(blob);
         
-        console.log(`✅ Valid WASM file downloaded from ${source}, size: ${(arrayBuffer.byteLength / 1024).toFixed(1)}KB`);
+        // Store in session storage
+        sessionStorage.setItem('ocr-wasm-path', blobUrl);
+        sessionStorage.setItem('ocr-wasm-binary', 'cached');
+        sessionStorage.setItem('ocr-wasm-source', source);
         
-        // Create a blob URL for the WASM data
-        try {
-          const blob = new Blob([arrayBuffer], { type: 'application/wasm' });
-          const blobUrl = URL.createObjectURL(blob);
-          sessionStorage.setItem('ocr-wasm-path', blobUrl);
-          sessionStorage.setItem('ocr-wasm-source', source);
-          console.log('Created blob URL for WASM file:', blobUrl);
-        } catch (blobError) {
-          console.error('Failed to create blob URL:', blobError);
-        }
-        
-        // Also try to store the binary data for redundancy
-        try {
-          sessionStorage.setItem('ocr-wasm-binary', arrayBufferToBase64(arrayBuffer));
-          console.log('WASM binary data cached in session storage');
-        } catch (storageError) {
-          console.warn('Could not store WASM binary in session storage (likely too large):', storageError);
-          // We already created the blob URL above, so this is just a warning
-        }
-        
-        // Now that we have WASM, also download training data
-        await downloadTrainingData();
-        
+        console.log(`Successfully downloaded WASM file from ${absoluteUrl}`);
+        console.log(`Created blob URL: ${blobUrl}`);
+        sourceUsed = source;
         return true;
       } catch (err) {
         console.error(`Error downloading from ${source}:`, err);
       }
     }
-    
-    // If all sources failed but we're on a subroute, try saving CDN paths anyway
-    if (isOnSubroute) {
-      console.log('All download attempts failed but we are on a subroute, forcing CDN paths');
-      sessionStorage.setItem('ocr-wasm-path', 'https://unpkg.com/tesseract-wasm@0.10.0/dist/tesseract-core.wasm');
-      sessionStorage.setItem('ocr-training-data-path', 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata');
-      return true;
-    }
-    
-    // All sources failed
-    console.error('⚠️ All WASM download sources failed');
+
+    console.error('Failed to download WASM file from any source');
     return false;
   } catch (error) {
-    console.error('Direct WASM download failed:', error);
+    console.error('WASM download error:', error);
     return false;
   }
 };
 
 /**
- * Downloads training data file from various sources
+ * Download training data file
  */
 export const downloadTrainingData = async (): Promise<boolean> => {
+  if (!isBrowser) return false;
+
   try {
-    console.log('Starting training data download...');
-    
-    // Get current base URL from the window location
-    const baseUrl = window.location.origin;
-    
-    // Check if we're on a subroute
-    const isOnSubroute = window.location.pathname.includes('/dashboard') || 
-                         window.location.pathname.includes('/login');
-    
-    // Check if already cached
-    const cachedTrainingData = sessionStorage.getItem('ocr-training-data-path');
-    if (cachedTrainingData) {
-      console.log('Training data path already cached:', cachedTrainingData);
-      return true;
-    }
-    
-    // For deployed sites on subroutes, prioritize CDN sources
-    const trainingDataSources = isOnSubroute ? [
-      // CDN sources first for subroutes
-      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
-      'https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/eng.traineddata',
-      // Then try root paths
-      `${baseUrl}/eng.traineddata`,
-      // Then tessdata subdirectory
-      `${baseUrl}/tessdata/eng.traineddata`,
-    ] : [
-      // Local paths first for main routes
-      `${baseUrl}/eng.traineddata`,
-      `${baseUrl}/tessdata/eng.traineddata`,
-      // Then CDN fallbacks
-      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata',
-      'https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/eng.traineddata',
+    const sources = [
+      '/tessdata/eng.traineddata',
+      '/eng.traineddata',
+      'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata'
     ];
-    
-    // Try each source until one works
-    for (const source of trainingDataSources) {
+
+    for (const source of sources) {
       try {
-        console.log(`Trying training data source: ${source}`);
+        const absoluteUrl = createAbsoluteUrl(source);
+        console.log(`Checking training data at: ${absoluteUrl}`);
         
-        // Add cache busting
-        const url = new URL(source);
-        url.searchParams.append('t', Date.now().toString());
-        
-        // First use HEAD to check if exists (faster than getting the whole file)
-        const headResponse = await fetch(url.toString(), { 
+        const response = await fetch(absoluteUrl, { 
           method: 'HEAD',
-          cache: 'no-store'
+          cache: 'no-cache' 
         });
         
-        if (!headResponse.ok) {
-          console.warn(`Training data not available at ${source}: ${headResponse.status}`);
-          continue;
-        }
-        
-        // Try to actually download a small part to verify it's accessible
-        try {
-          const response = await fetch(url.toString(), {
-            method: 'GET',
-            headers: {
-              'Range': 'bytes=0-1023' // Only get first KB to check if it's valid
-            }
-          });
-          
-          if (!response.ok) {
-            console.warn(`Failed to download training data from ${source}: ${response.status}`);
-            continue;
-          }
-          
-          const buffer = await response.arrayBuffer();
-          if (buffer.byteLength > 0) {
-            console.log(`✅ Found valid training data at ${source} (verified ${buffer.byteLength} bytes)`);
-            sessionStorage.setItem('ocr-training-data-path', source);
-            return true;
-          }
-        } catch (downloadError) {
-          console.warn(`Error verifying training data at ${source}:`, downloadError);
-          continue;
+        if (response.ok) {
+          sessionStorage.setItem('ocr-training-data-path', absoluteUrl);
+          console.log(`Found valid training data at: ${absoluteUrl}`);
+          return true;
         }
       } catch (err) {
-        console.error(`Error checking training data at ${source}:`, err);
+        console.warn(`Error checking ${source}:`, err);
       }
     }
-    
-    // If on subroute, force GitHub CDN path as fallback
-    if (isOnSubroute) {
-      const githubSourceUrl = 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata';
-      console.log('On subroute, forcing GitHub CDN for training data:', githubSourceUrl);
-      sessionStorage.setItem('ocr-training-data-path', githubSourceUrl);
-      return true;
-    }
-    
-    // GitHub raw content fallback as last resort
-    try {
-      const githubSourceUrl = 'https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0/eng.traineddata';
-      console.log('Trying GitHub raw content as last resort:', githubSourceUrl);
-      sessionStorage.setItem('ocr-training-data-path', githubSourceUrl);
-      return true;
-    } catch (error) {
-      console.error('Error setting GitHub fallback:', error);
-    }
-    
+
+    console.error('Could not find valid training data');
     return false;
   } catch (error) {
-    console.error('Training data download failed:', error);
+    console.error('Training data download error:', error);
     return false;
   }
 };
 
-// Helper function to convert ArrayBuffer to Base64 string
-const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-  try {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-  } catch (error) {
-    console.error('Error converting ArrayBuffer to Base64:', error);
-    throw error;
-  }
-};
-
-// Helper function to convert Base64 string to ArrayBuffer
-export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  try {
-    const binaryString = window.atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-  } catch (error) {
-    console.error('Error converting Base64 to ArrayBuffer:', error);
-    throw error;
-  }
-};
-
-// Create a Blob URL from cached WASM data
+/**
+ * Get cached WASM blob URL if available
+ */
 export const createWasmBlobUrl = (): string | null => {
+  if (!isBrowser) return null;
+  
   try {
-    // Check for existing blob URL first
-    const existingBlobUrl = sessionStorage.getItem('ocr-wasm-path');
-    if (existingBlobUrl && existingBlobUrl.startsWith('blob:')) {
-      return existingBlobUrl;
+    return sessionStorage.getItem('ocr-wasm-path');
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Create a URL for a WASM file with fallbacks
+ */
+export const resolveWasmUrl = async (defaultPath = '/tessdata/tesseract-core.wasm'): Promise<string> => {
+  // First check if we have a cached blob URL
+  const cachedBlobUrl = createWasmBlobUrl();
+  if (cachedBlobUrl) {
+    console.log(`Using cached WASM blob URL: ${cachedBlobUrl}`);
+    return cachedBlobUrl;
+  }
+  
+  // Try to create a new URL
+  try {
+    // Get the CDN URL as a fallback
+    await downloadWasmFile('tesseract-core.wasm');
+    
+    // If download succeeded, we should have a blob URL now
+    const newBlobUrl = createWasmBlobUrl();
+    if (newBlobUrl) {
+      return newBlobUrl;
     }
     
-    // Otherwise try to create one from the cached binary data
-    const wasmBase64 = sessionStorage.getItem('ocr-wasm-binary');
-    if (!wasmBase64) return null;
-    
-    const wasmBuffer = base64ToArrayBuffer(wasmBase64);
-    const wasmBlob = new Blob([wasmBuffer], { type: 'application/wasm' });
-    const blobUrl = URL.createObjectURL(wasmBlob);
-    
-    // Store the blob URL for future reference
-    sessionStorage.setItem('ocr-wasm-path', blobUrl);
-    
-    return blobUrl;
+    // If still no blob URL, use the default path
+    return createAbsoluteUrl(defaultPath);
   } catch (error) {
-    console.error('Failed to create WASM blob URL:', error);
-    return null;
+    console.error('Error resolving WASM URL:', error);
+    return createAbsoluteUrl(defaultPath);
+  }
+};
+
+/**
+ * Create a blob URL for worker script to avoid CORS issues
+ */
+export const createWorkerBlobURL = async (workerPath: string): Promise<string> => {
+  if (!isBrowser) return workerPath;
+  
+  try {
+    const absoluteUrl = createAbsoluteUrl(workerPath);
+    console.log(`Fetching worker script from: ${absoluteUrl}`);
+    
+    const response = await fetch(absoluteUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch worker script: ${response.status}`);
+    }
+    
+    const text = await response.text();
+    const blob = new Blob([text], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    
+    console.log(`Created worker blob URL: ${url}`);
+    return url;
+  } catch (error) {
+    console.error('Error creating worker blob URL:', error);
+    return workerPath;
   }
 };
