@@ -1,4 +1,3 @@
-
 /**
  * Utilities for directly downloading WASM files to overcome CORS and path issues
  */
@@ -7,6 +6,21 @@ import { normalizePath, createAbsoluteUrl } from './pathUtils';
 
 // Check if in browser environment
 const isBrowser = typeof window !== 'undefined';
+
+/** Validate WASM binary format */
+const isValidWasm = (buffer: ArrayBuffer): boolean => {
+  try {
+    const magic = new Uint8Array(buffer.slice(0, 4));
+    return (
+      magic[0] === 0x00 &&  // \0
+      magic[1] === 0x61 &&  // a
+      magic[2] === 0x73 &&  // s
+      magic[3] === 0x6d     // m
+    );
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Directly download and store a WASM file in the browser to work around CORS issues
@@ -17,25 +31,20 @@ export const downloadWasmFile = async (filename: string): Promise<boolean> => {
   try {
     console.log(`Attempting to download WASM file: ${filename}`);
     const sources = [
-      `/tessdata/${filename}`,
-      `/${filename}`,
-      `/assets/${filename}`,
-      `https://unpkg.com/tesseract-wasm@0.10.0/dist/${filename}`
+      `/assets/${filename}`,      // Try assets directory first
+      `/tessdata/${filename}`,    // Then tessdata
+      `/${filename}`,             // Then root
+      `https://unpkg.com/tesseract-wasm@0.10.0/dist/${filename}` // CDN fallback
     ];
 
-    // Track the source for debugging
-    let sourceUsed = '';
-
-    // Try each source
     for (const source of sources) {
       try {
         console.log(`Trying source: ${source}`);
         const absoluteUrl = createAbsoluteUrl(source);
         
-        // Use arraybuffer to ensure we get binary data, not text
         const response = await fetch(absoluteUrl, { 
           cache: 'no-cache',
-          headers: { 'Accept': 'application/octet-stream' }
+          headers: { 'Accept': 'application/wasm' }
         });
         
         if (!response.ok) {
@@ -43,23 +52,15 @@ export const downloadWasmFile = async (filename: string): Promise<boolean> => {
           continue;
         }
 
-        // Get binary data
         const arrayBuffer = await response.arrayBuffer();
         
         // Validate WASM magic bytes
-        const bytes = new Uint8Array(arrayBuffer);
-        const WASM_MAGIC_BYTES = new Uint8Array([0x00, 0x61, 0x73, 0x6D]);
-        
-        const isValidWasm = bytes.length >= WASM_MAGIC_BYTES.length && 
-                           WASM_MAGIC_BYTES.every((b, i) => bytes[i] === b);
-        
-        if (!isValidWasm) {
-          console.warn(`Invalid WASM file from ${absoluteUrl}. First bytes:`, 
-            Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+        if (!isValidWasm(arrayBuffer)) {
+          console.warn(`Invalid WASM file from ${absoluteUrl}`);
           continue;
         }
 
-        // Create blob URL
+        // Create blob URL for valid WASM
         const blob = new Blob([arrayBuffer], { type: 'application/wasm' });
         const blobUrl = URL.createObjectURL(blob);
         
@@ -69,8 +70,6 @@ export const downloadWasmFile = async (filename: string): Promise<boolean> => {
         sessionStorage.setItem('ocr-wasm-source', source);
         
         console.log(`Successfully downloaded WASM file from ${absoluteUrl}`);
-        console.log(`Created blob URL: ${blobUrl}`);
-        sourceUsed = source;
         return true;
       } catch (err) {
         console.error(`Error downloading from ${source}:`, err);

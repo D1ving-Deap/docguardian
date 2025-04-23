@@ -1,0 +1,20 @@
+
+# Set correct MIME type for WebAssembly
+AddType application/wasm .wasm
+
+# Ensure proper CORS headers for WASM files
+<FilesMatch "\.(wasm)$">
+  Header set Access-Control-Allow-Origin "*"
+  Header set Access-Control-Allow-Methods "GET, OPTIONS"
+  Header set Access-Control-Allow-Headers "Content-Type"
+</FilesMatch>
+
+# Prevent 404 page from being served as WASM
+<Files ~ "\.wasm$">
+  ForceType application/wasm
+</Files>
+
+# Redirect old WASM paths to new locations (fallback)
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^tesseract-core\.wasm$ /assets/tesseract-core.wasm [L,R=301]

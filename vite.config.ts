@@ -1,5 +1,3 @@
-
-// vite.config.ts
 import { defineConfig, Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -34,82 +32,42 @@ export default defineConfig(({ mode }) => ({
         }
       }
     } as Plugin,
-    // Custom plugin to copy WASM files during build AND development
+    // Enhanced WASM file copying plugin
     {
-      name: 'copy-wasm-files',
-      buildStart() {
-        // We'll run the actual copying when the build starts
-        console.log('Ensuring WASM files are available...');
-        const publicDir = path.resolve(__dirname, 'public/tessdata');
+      name: 'wasm-file-handler',
+      apply: 'build',
+      async buildStart() {
+        // Copy files to both /assets/ and /tessdata/ for maximum compatibility
+        const publicDir = path.resolve(__dirname, 'public');
+        const tessDataDir = path.join(publicDir, 'tessdata');
+        const assetsDir = path.join(publicDir, 'assets');
         
-        // Make sure the directory exists
-        if (!fs.existsSync(publicDir)) {
-          fs.mkdirSync(publicDir, { recursive: true });
-          console.log('Created tessdata directory in public');
-        }
-        
-        // Copy files from node_modules if needed
+        [tessDataDir, assetsDir].forEach(dir => {
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+        });
+
         const sourceDir = path.resolve(__dirname, 'node_modules/tesseract-wasm/dist');
         if (fs.existsSync(sourceDir)) {
-          try {
-            ['tesseract-core.wasm', 'tesseract-worker.js'].forEach(file => {
-              const sourcePath = path.join(sourceDir, file);
-              const destPath = path.join(publicDir, file);
-              
-              if (fs.existsSync(sourcePath)) {
-                fs.copyFileSync(sourcePath, destPath);
-                console.log(`Copied ${file} to public/tessdata/`);
-              } else {
-                console.warn(`Source file not found: ${sourcePath}`);
-              }
-            });
-            
-            // Also copy to project root for fallback
-            ['tesseract-core.wasm', 'tesseract-worker.js'].forEach(file => {
-              const sourcePath = path.join(sourceDir, file);
-              const destPath = path.join(__dirname, 'public', file);
-              
-              if (fs.existsSync(sourcePath)) {
-                fs.copyFileSync(sourcePath, destPath);
-                console.log(`Copied ${file} to public/ (root)`);
-              }
-            });
-            
-            // Also copy training data if needed
-            const trainingDataSource = path.resolve(__dirname, 'node_modules/tesseract-wasm/tessdata/eng.traineddata');
-            const trainingDataDest = path.join(publicDir, 'eng.traineddata');
-            
-            if (fs.existsSync(trainingDataSource)) {
-              fs.copyFileSync(trainingDataSource, trainingDataDest);
-              console.log(`Copied eng.traineddata to public/tessdata/`);
-              
-              // Also copy to root public
-              fs.copyFileSync(trainingDataSource, path.join(__dirname, 'public', 'eng.traineddata'));
-              console.log(`Copied eng.traineddata to public/ (root)`);
-            } else {
-              console.warn(`Training data file not found: ${trainingDataSource}`);
+          ['tesseract-core.wasm', 'tesseract-worker.js'].forEach(file => {
+            const sourcePath = path.join(sourceDir, file);
+            if (fs.existsSync(sourcePath)) {
+              // Copy to both /assets/ and /tessdata/
+              fs.copyFileSync(sourcePath, path.join(assetsDir, file));
+              fs.copyFileSync(sourcePath, path.join(tessDataDir, file));
+              console.log(`Copied ${file} to both /assets/ and /tessdata/`);
             }
-          } catch (error) {
-            console.error('Error copying WASM files:', error);
+          });
+
+          // Also copy training data
+          const trainingDataSource = path.resolve(__dirname, 'node_modules/tesseract-wasm/tessdata/eng.traineddata');
+          if (fs.existsSync(trainingDataSource)) {
+            fs.copyFileSync(trainingDataSource, path.join(tessDataDir, 'eng.traineddata'));
+            fs.copyFileSync(trainingDataSource, path.join(assetsDir, 'eng.traineddata'));
+            console.log('Copied training data to both locations');
           }
-        } else {
-          console.warn(`Source directory not found: ${sourceDir}`);
         }
-      }
-    },
-    // Special plugin to handle WASM imports
-    {
-      name: 'wasm-import-handler',
-      load(id: string) {
-        if (id.endsWith('.wasm')) {
-          // Generate a virtual module that loads the WASM file
-          const wasmPath = id.replace(/^.*[\\\/]/, '');
-          const code = `
-            export default new URL('/tessdata/${wasmPath}', import.meta.url).href;
-          `;
-          return { code };
-        }
-        return null;
       }
     }
   ].filter(Boolean),
@@ -122,18 +80,21 @@ export default defineConfig(({ mode }) => ({
     assetsInlineLimit: 0, // Prevent WASM inlining
     rollupOptions: {
       output: {
-        // Ensure WASM files are properly named and handled
         assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith('.wasm')) {
-            return 'assets/wasm/[name]-[hash][extname]';
+          if (assetInfo.name?.endsWith('.wasm')) {
+            // Ensure WASM files go to both /assets/ and /tessdata/
+            return 'assets/[name][extname]';
           }
           return 'assets/[name]-[hash][extname]';
         }
       }
     }
   },
-  assetsInclude: ['**/*.wasm', '**/*.traineddata'], // Explicitly include WASM and training data files
+  
+  // Explicitly include WASM and training data files
+  assetsInclude: ['**/*.wasm', '**/*.traineddata'],
+  
   optimizeDeps: {
-    exclude: ['tesseract-wasm'], // Exclude from optimization
+    exclude: ['tesseract-wasm'], // Exclude from optimization to prevent WASM issues
   },
 }));
