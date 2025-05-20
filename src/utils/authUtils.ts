@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export const validateEmail = (email: string): boolean => {
@@ -30,6 +29,11 @@ export const getAuthErrorMessage = (error: any): string => {
   // Check for specific Supabase error messages
   if (errorMessage.includes("Email not confirmed")) {
     return "Your email is not verified. Please check your inbox for the verification link.";
+  }
+  
+  // Check for captcha errors
+  if (errorMessage.includes("captcha") || errorMessage.includes("CAPTCHA")) {
+    return "Captcha verification failed. Please try again later or contact support.";
   }
   
   switch (errorCode) {
@@ -72,6 +76,7 @@ export const resendVerificationEmail = async (email: string): Promise<void> => {
       email,
       options: {
         emailRedirectTo: redirectUrl,
+        captchaToken: 'disabled', // Disable captcha for this specific operation
       }
     });
 
@@ -86,6 +91,7 @@ export const resendVerificationEmail = async (email: string): Promise<void> => {
         password: generateTempPassword(), // Generate a secure random password
         options: {
           emailRedirectTo: window.location.origin,
+          captchaToken: 'disabled', // Disable captcha for this specific operation
         },
       });
       
@@ -123,4 +129,22 @@ function generateTempPassword(): string {
 export const validateTwoFactorCode = (code: string): boolean => {
   // Simple validation to check if the code is 6 digits
   return /^\d{6}$/.test(code);
+};
+
+// Helper function to clean up auth state
+export const cleanupAuthState = () => {
+  // Remove standard auth tokens
+  localStorage.removeItem('supabase.auth.token');
+  // Remove all Supabase auth keys from localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+  // Remove from sessionStorage if in use
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      sessionStorage.removeItem(key);
+    }
+  });
 };

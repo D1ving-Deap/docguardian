@@ -13,6 +13,30 @@ const WaitlistSignupSection: React.FC = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const sendWelcomeEmail = async (email: string) => {
+    try {
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/send-welcome-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
+        body: JSON.stringify({ email })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send welcome email');
+      }
+      
+      const data = await response.json();
+      console.log('Welcome email sent:', data);
+      return data;
+    } catch (error) {
+      console.error('Error sending welcome email:', error);
+      // Don't throw here - we don't want the main flow to fail if just the email fails
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -73,6 +97,9 @@ const WaitlistSignupSection: React.FC = () => {
         setIsLoading(false);
         return;
       }
+      
+      // Send welcome email
+      await sendWelcomeEmail(email);
       
       toast.success("Thanks for joining our waitlist!", {
         duration: 4000,

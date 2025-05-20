@@ -31,6 +31,7 @@ const MetadataDetection: React.FC = () => {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("metadata");
+  const [rawMetadata, setRawMetadata] = useState<any>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -54,8 +55,8 @@ const MetadataDetection: React.FC = () => {
       const arrayBuffer = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-      // Debug logging to see what we're actually getting from the PDF
-      console.log("Raw metadata from PDF:", {
+      // Get all raw metadata and store it for debugging
+      const rawMetadataObject = {
         producer: pdfDoc.getProducer(),
         creator: pdfDoc.getCreator(),
         creationDate: pdfDoc.getCreationDate(),
@@ -63,8 +64,39 @@ const MetadataDetection: React.FC = () => {
         author: pdfDoc.getAuthor(),
         title: pdfDoc.getTitle(),
         subject: pdfDoc.getSubject(),
-        keywords: pdfDoc.getKeywords()
-      });
+        keywords: pdfDoc.getKeywords(),
+      };
+
+      // Also try to get the complete document metadata dictionary
+      const context = pdfDoc.context;
+      const catalogRef = pdfDoc.catalog.ref;
+      const catalog = pdfDoc.context.lookup(catalogRef, PDFDocument.prototype);
+      const infoDictRef = catalog.get(PDFDocument.prototype, 'Info');
+      
+      let extraMetadata = {};
+      if (infoDictRef) {
+        try {
+          const infoDict = context.lookup(infoDictRef);
+          // Extract all key-value pairs from the information dictionary
+          extraMetadata = {
+            ...Object.fromEntries(
+              Object.entries(infoDict.dict).map(([key, value]) => {
+                if (typeof value === 'object' && value.value !== undefined) {
+                  return [key, value.value];
+                }
+                return [key, String(value)];
+              })
+            )
+          };
+          console.log("Extra PDF metadata:", extraMetadata);
+        } catch (e) {
+          console.error("Error extracting additional metadata:", e);
+        }
+      }
+
+      setRawMetadata({ ...rawMetadataObject, ...extraMetadata });
+      console.log("Raw metadata from PDF:", rawMetadataObject);
+      console.log("Additional metadata:", extraMetadata);
 
       const producer = pdfDoc.getProducer() || "Unknown";
       const creator = pdfDoc.getCreator() || "Unknown";
@@ -75,43 +107,59 @@ const MetadataDetection: React.FC = () => {
       const subject = pdfDoc.getSubject() || "Unknown";
       const keywords = pdfDoc.getKeywords() || "None";
 
+      // Check for suspicious patterns in metadata
+      const hasGithubUrl = producer.includes("github.com") || creator.includes("github.com");
+      const isGeneric = producer === "Unknown" || producer.includes("pdf-lib") || creator.includes("pdf-lib");
+      
       const now = new Date();
       const metadataItems: MetadataItem[] = [
         {
           name: "Producer",
           value: producer,
-          severity: producer.toLowerCase().includes("photoshop") ? "red" : "green",
-          explanation: producer.toLowerCase().includes("photoshop") ? "Created with image editing software - suspicious" : "Produced with standard software"
+          severity: producer.toLowerCase().includes("photoshop") ? "red" : 
+                   hasGithubUrl ? "yellow" : 
+                   isGeneric ? "yellow" : "green",
+          explanation: producer.toLowerCase().includes("photoshop") ? "Created with image editing software - suspicious" : 
+                      hasGithubUrl ? "Generic GitHub reference - potentially modified" :
+                      isGeneric ? "Generic producer information - limited authenticity verification" : 
+                      "Produced with standard software"
         },
         {
           name: "Creator",
           value: creator,
-          severity: "neutral",
-          explanation: "The application that originally created the document"
+          severity: hasGithubUrl ? "yellow" : isGeneric ? "yellow" : "neutral",
+          explanation: hasGithubUrl ? "Generic GitHub reference - limited verification possible" :
+                      isGeneric ? "Generic creator information - limited authenticity verification" :
+                      "The application that originally created the document"
         },
         {
           name: "Creation Date",
           value: creationDate ? creationDate.toISOString().split('T')[0] : "Unknown",
-          severity: creationDate && (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60 * 24) < 7 ? "yellow" : "neutral",
-          explanation: creationDate && (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60 * 24) < 7 ? "Recently created document - check for freshness" : "Creation date appears reasonable"
+          severity: !creationDate ? "yellow" :
+                    (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60 * 24) < 7 ? "yellow" : "neutral",
+          explanation: !creationDate ? "Missing creation date - suspicious" :
+                      (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60 * 24) < 7 ? "Recently created document - check for freshness" : "Creation date appears reasonable"
         },
         {
           name: "Modification Date",
           value: modificationDate ? modificationDate.toISOString().split('T')[0] : "Unknown",
-          severity: "neutral",
-          explanation: "Date the document was last modified"
+          severity: !modificationDate ? "yellow" : "neutral",
+          explanation: !modificationDate ? "Missing modification date - potential red flag" : "Date the document was last modified"
         },
         {
           name: "Author",
           value: author,
-          severity: ["unknown", "user", "admin"].includes(author.toLowerCase()) ? "yellow" : "green",
-          explanation: ["unknown", "user", "admin"].includes(author.toLowerCase()) ? "Generic or missing author info" : "Author field is specific"
+          severity: ["unknown", "user", "admin"].includes(author.toLowerCase()) ? "yellow" : 
+                   author === "Unknown" ? "yellow" : "green",
+          explanation: ["unknown", "user", "admin"].includes(author.toLowerCase()) ? "Generic or missing author info" : 
+                      author === "Unknown" ? "Missing author information - limited verification" : 
+                      "Author field is specific"
         },
         {
           name: "Title",
           value: title,
-          severity: "neutral",
-          explanation: "Document title metadata"
+          severity: title === "Untitled" ? "yellow" : "neutral",
+          explanation: title === "Untitled" ? "Missing document title - potential red flag" : "Document title metadata"
         },
         {
           name: "Subject",
@@ -126,6 +174,19 @@ const MetadataDetection: React.FC = () => {
           explanation: "Keywords associated with this document"
         }
       ];
+
+      // Add any additional metadata from the info dictionary
+      Object.entries(extraMetadata).forEach(([key, value]) => {
+        // Don't add duplicate entries for standard fields
+        if (!["Producer", "Creator", "Author", "Title", "Subject", "Keywords"].includes(key)) {
+          metadataItems.push({
+            name: key,
+            value: String(value),
+            severity: "neutral",
+            explanation: `Additional document metadata: ${key}`
+          });
+        }
+      });
 
       // Generate timeline events
       const timelineEvents: TimelineEvent[] = [];
@@ -178,6 +239,16 @@ const MetadataDetection: React.FC = () => {
           date: null,
           label: "Format Conversion Detected",
           description: "Document was likely converted from Word to PDF",
+          type: "other"
+        });
+      }
+
+      // Check for potential manipulation based on metadata
+      if (isGeneric) {
+        timelineEvents.push({
+          date: null,
+          label: "Limited Metadata",
+          description: "Document has limited or generic metadata which reduces verification confidence",
           type: "other"
         });
       }
@@ -311,6 +382,7 @@ const MetadataDetection: React.FC = () => {
                       </TabsList>
                       
                       <TabsContent value="metadata" className="mt-4">
+                        {/* ... keep existing code for alerts */}
                         {metadata.filter(item => item.severity === "red").length > 0 && (
                           <Alert variant="destructive" className="mb-4 border-red-600">
                             <AlertCircle className="h-5 w-5" />
@@ -374,6 +446,7 @@ const MetadataDetection: React.FC = () => {
                         </Table>
                       </TabsContent>
                       
+                      {/* ... keep existing code for timeline tab content */}
                       <TabsContent value="timeline" className="mt-4 space-y-6">
                         {timeline.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
@@ -465,6 +538,7 @@ const MetadataDetection: React.FC = () => {
                     setMetadata([]);
                     setTimeline([]);
                     setAnalysisComplete(false);
+                    setRawMetadata(null);
                   }}
                 >
                   <XCircle className="mr-1 h-4 w-4" /> Clear Results
