@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,11 +14,16 @@ const WaitlistSignupSection: React.FC = () => {
 
   const sendWelcomeEmail = async (email: string) => {
     try {
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/send-welcome-email`, {
+      // Get the supabaseUrl and supabaseKey in a safer way
+      // Get the current URL without trailing slash
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': `Bearer ${supabaseKey}`
         },
         body: JSON.stringify({ email })
       });
