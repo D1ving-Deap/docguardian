@@ -62,12 +62,16 @@ export const getAuthErrorMessage = (error: any): string => {
 
 export const resendVerificationEmail = async (email: string): Promise<void> => {
   try {
+    // Get the current origin for proper redirect
+    const redirectUrl = window.location.origin;
+    console.log("Using redirect URL:", redirectUrl);
+    
     // In Supabase v2, we use resend for resending verification emails
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: "https://verify-flow.com", // ✅ full URL with protocol
+        emailRedirectTo: redirectUrl,
       }
     });
 
@@ -81,7 +85,7 @@ export const resendVerificationEmail = async (email: string): Promise<void> => {
         email,
         password: generateTempPassword(), // Generate a secure random password
         options: {
-          emailRedirectTo: "https://verify-flow.com", // ✅ full URL with protocol
+          emailRedirectTo: window.location.origin,
         },
       });
       

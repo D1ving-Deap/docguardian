@@ -43,7 +43,10 @@ const WaitlistSignupSection: React.FC = () => {
 
       console.log("Existing emails check:", existingEmails);
       if (existingEmails && existingEmails.length > 0) {
-        toast.info("You're already on our waitlist!");
+        toast.info("You're already on our waitlist!", {
+          duration: 4000,
+          position: "top-center",
+        });
         setIsLoading(false);
         return;
       }
@@ -63,16 +66,25 @@ const WaitlistSignupSection: React.FC = () => {
       
       if (insertError) {
         console.error("Error adding to waitlist:", insertError);
-        toast.error("Failed to join waitlist. Please try again.");
+        toast.error("Failed to join waitlist. Please try again.", {
+          duration: 4000,
+          position: "top-center",
+        });
         setIsLoading(false);
         return;
       }
       
-      toast.success("Thanks for joining our waitlist!");
+      toast.success("Thanks for joining our waitlist!", {
+        duration: 4000,
+        position: "top-center",
+      });
       setEmail("");
     } catch (err) {
       console.error("Waitlist submission error:", err);
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error("An unexpected error occurred. Please try again.", {
+        duration: 4000,
+        position: "top-center",
+      });
     } finally {
       setIsLoading(false);
     }

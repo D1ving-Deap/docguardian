@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Mail, CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { resendVerificationEmail, validateEmail } from "@/utils/authUtils";
+import { Toaster } from "@/components/ui/toaster";
 
 const VerifyEmail = () => {
   const { toast } = useToast();
@@ -46,6 +47,7 @@ const VerifyEmail = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
+      <Toaster />
       <div className="w-full max-w-md p-8 space-y-4 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold mb-2">Email Verification Sent</h1>
         <p className="mb-6">Please check your inbox and click the verification link to activate your account.</p>

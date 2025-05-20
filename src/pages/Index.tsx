@@ -7,7 +7,7 @@ import HowItWorks from "@/components/HowItWorks";
 import WaitlistForm from "@/components/WaitlistForm";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast, Toaster } from "sonner";
 import MetadataDetection from "@/components/MetadataDetection";
 
 const Index: React.FC = () => {
@@ -18,6 +18,7 @@ const Index: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Toaster position="top-center" />
       <NavBar />
       <main>
         <HeroSection />

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -5,6 +6,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Toaster } from "@/components/ui/toaster";
 
 import LoginForm from "@/components/auth/LoginForm";
 import RegisterForm from "@/components/auth/RegisterForm";
@@ -59,6 +61,15 @@ const Login = () => {
     setLoading(true);
     try {
       console.log("Attempting to sign in with:", email);
+      
+      // Clean up any existing auth state
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Attempt to sign in
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -251,6 +262,7 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+      <Toaster />
       <div className="absolute top-4 left-4">
         <a 
           href="/" 

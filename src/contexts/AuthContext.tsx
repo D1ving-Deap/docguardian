@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
@@ -13,6 +14,24 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Utility to clean up auth state
+const cleanupAuthState = () => {
+  // Remove standard auth tokens
+  localStorage.removeItem('supabase.auth.token');
+  // Remove all Supabase auth keys from localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+  // Remove from sessionStorage if in use
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      sessionStorage.removeItem(key);
+    }
+  });
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -58,6 +77,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      // Clean up existing auth state
+      cleanupAuthState();
+      
+      // Attempt global sign out first
+      try {
+        await supabase.auth.signOut({ scope: 'global' });
+      } catch (err) {
+        // Continue even if this fails
+        console.log("Global sign out attempt error:", err);
+      }
+      
       console.log("Attempting sign in for:", email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -101,13 +131,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       setIsLoading(true);
+      // Clean up existing auth state
+      cleanupAuthState();
+      
       console.log("Attempting sign up for:", email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { full_name: fullName },
-          emailRedirectTo: "https://verify-flow.com", // ✅ full URL with protocol
+          emailRedirectTo: window.location.origin, // Use current origin as redirect URL
         },
       });
 
@@ -151,6 +184,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       setIsLoading(true);
+      // Clean up auth state
+      cleanupAuthState();
+      
       console.log("Attempting sign out");
       const { error } = await supabase.auth.signOut();
       
@@ -165,6 +201,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       console.log("Sign out successful");
+      // Force page reload for a clean state
+      window.location.href = '/';
     } catch (error: any) {
       toast({
         title: "Sign out failed",
