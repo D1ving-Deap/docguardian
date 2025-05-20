@@ -67,31 +67,35 @@ const MetadataDetection: React.FC = () => {
         keywords: pdfDoc.getKeywords(),
       };
 
-      // Also try to get the complete document metadata dictionary
-      const context = pdfDoc.context;
-      const catalogRef = pdfDoc.catalog.ref;
-      const catalog = pdfDoc.context.lookup(catalogRef, PDFDocument.prototype);
-      const infoDictRef = catalog.get(PDFDocument.prototype, 'Info');
+      // Try to access additional information from the PDF's information dictionary
+      // This section has been refactored to avoid TypeScript errors
+      let extraMetadata: Record<string, any> = {};
       
-      let extraMetadata = {};
-      if (infoDictRef) {
-        try {
-          const infoDict = context.lookup(infoDictRef);
-          // Extract all key-value pairs from the information dictionary
-          extraMetadata = {
-            ...Object.fromEntries(
-              Object.entries(infoDict.dict).map(([key, value]) => {
-                if (typeof value === 'object' && value.value !== undefined) {
-                  return [key, value.value];
+      try {
+        // We're using any type here to bypass TypeScript restrictions
+        // since pdf-lib doesn't properly expose these internals in its types
+        const pdfDocAny = pdfDoc as any;
+        
+        if (pdfDocAny._catalog && pdfDocAny._catalog.get) {
+          const infoDict = pdfDocAny._catalog.get('Info');
+          if (infoDict && infoDict.dict) {
+            // Extract all entries from the info dictionary that we can access
+            Object.entries(infoDict.dict).forEach(([key, value]: [string, any]) => {
+              if (value && typeof value === 'object') {
+                if ('value' in value) {
+                  extraMetadata[key] = value.value;
+                } else {
+                  extraMetadata[key] = String(value);
                 }
-                return [key, String(value)];
-              })
-            )
-          };
-          console.log("Extra PDF metadata:", extraMetadata);
-        } catch (e) {
-          console.error("Error extracting additional metadata:", e);
+              } else if (value !== undefined) {
+                extraMetadata[key] = String(value);
+              }
+            });
+          }
         }
+        console.log("Extra PDF metadata:", extraMetadata);
+      } catch (e) {
+        console.error("Error extracting additional metadata:", e);
       }
 
       setRawMetadata({ ...rawMetadataObject, ...extraMetadata });
@@ -382,7 +386,6 @@ const MetadataDetection: React.FC = () => {
                       </TabsList>
                       
                       <TabsContent value="metadata" className="mt-4">
-                        {/* ... keep existing code for alerts */}
                         {metadata.filter(item => item.severity === "red").length > 0 && (
                           <Alert variant="destructive" className="mb-4 border-red-600">
                             <AlertCircle className="h-5 w-5" />
@@ -446,7 +449,6 @@ const MetadataDetection: React.FC = () => {
                         </Table>
                       </TabsContent>
                       
-                      {/* ... keep existing code for timeline tab content */}
                       <TabsContent value="timeline" className="mt-4 space-y-6">
                         {timeline.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
@@ -496,7 +498,6 @@ const MetadataDetection: React.FC = () => {
                               ))}
                             </div>
 
-                            {/* Show insights about the timeline */}
                             {timeline.length > 1 && (
                               <Card className="mt-6 bg-slate-50 dark:bg-slate-800/50">
                                 <CardHeader className="py-4">
