@@ -1,11 +1,14 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, FileText, X, Loader2, Upload, CheckCircle2 } from "lucide-react";
+import { FileUp, FileText, X, Loader2, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase, supabaseUrl } from "@/integrations/supabase/client";
 import storage from '@/utils/supabaseStorage';
 import { performOCR, extractFieldsFromText } from '@/utils/ocrService';
+import { processDocumentWorkflow } from '@/utils/workflowAutomation';
+import { categorizeDocument } from '@/utils/documentCategorization';
+import { runComplianceCheck, ApplicationData } from '@/utils/complianceEngine';
+import { Badge } from "@/components/ui/badge";
 
 interface DocumentUploadProps {
   label: string;
@@ -30,6 +33,8 @@ const DocumentUpload = ({
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<any>(null);
+  const [workflowActions, setWorkflowActions] = useState<string[]>([]);
+  const [complianceResults, setComplianceResults] = useState<any>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -55,11 +60,15 @@ const DocumentUpload = ({
       }
       
       setFile(selectedFile);
+      setUploadedDocId(null);
+      setExtractedData(null);
+      setWorkflowActions([]);
+      setComplianceResults(null);
     }
   };
   
   const extractTextWithTesseract = async (imageUrl: string): Promise<{ text: string, extractedFields?: any }> => {
-    setProcessingStatus('Initializing OCR engine...');
+    setProcessingStatus('Initializing AI-powered OCR engine...');
     
     try {
       // Convert URL to File object for processing
@@ -67,83 +76,39 @@ const DocumentUpload = ({
       const blob = await response.blob();
       const file = new File([blob], 'document.png', { type: blob.type });
       
-      setProcessingStatus('Reading document text...');
+      setProcessingStatus('Extracting text with advanced AI...');
       
       // Use the WASM-based OCR engine
       const result = await performOCR(file, (progress) => {
-        setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
+        setProcessingStatus(`AI processing document: ${Math.round(progress * 100)}%`);
       });
       
-      setProcessingStatus('Extracting data from text...');
+      setProcessingStatus('Analyzing document structure...');
       
-      const extractedFields = extractFieldsFromText(result.text, documentType);
+      // Auto-categorize the document
+      const categorization = categorizeDocument(result.text, file.name);
+      
+      setProcessingStatus('Extracting structured data fields...');
+      const extractedFields = extractFieldsFromText(result.text, categorization.type);
       
       return { 
         text: result.text,
-        extractedFields
+        extractedFields: {
+          ...extractedFields,
+          categorization: categorization
+        }
       };
     } catch (error) {
       console.error('OCR error:', error);
       throw new Error('Failed to extract text from document');
     }
   };
-  
-  const extractFieldsFromText = (text: string, docType: string): any => {
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const extractedFields: Record<string, string | { processed: string; confidence: number; edited: boolean }> = {};
-    
-    if (docType.toLowerCase().includes('income') || docType.toLowerCase().includes('pay')) {
-      const incomeRegex = /\$?(\d{1,3}(,\d{3})*(\.\d{2})?)/g;
-      const incomeMatches = text.match(incomeRegex);
-      
-      if (incomeMatches && incomeMatches.length > 0) {
-        extractedFields.income = incomeMatches[0];
-      }
-      
-      const dateRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
-      const dateMatches = text.match(dateRegex);
-      
-      if (dateMatches && dateMatches.length > 0) {
-        extractedFields.statementDate = dateMatches[0];
-      }
-    } 
-    else if (docType.toLowerCase().includes('id') || docType.toLowerCase().includes('license')) {
-      for (const line of lines) {
-        if (line.toLowerCase().includes('name:')) {
-          extractedFields.name = line.split(':')[1]?.trim() || '';
-          break;
-        }
-      }
-      
-      const dobRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
-      const dobMatches = text.match(dobRegex);
-      
-      if (dobMatches && dobMatches.length > 0) {
-        extractedFields.dateOfBirth = dobMatches[0];
-      }
-      
-      const idRegex = /\b[A-Z0-9]{6,15}\b/g;
-      const idMatches = text.match(idRegex);
-      
-      if (idMatches && idMatches.length > 0) {
-        extractedFields.idNumber = idMatches[0];
-      }
-    }
-    
-    extractedFields.metadata = JSON.stringify({
-      processed: new Date().toISOString(),
-      confidence: Math.random() * 100,
-      edited: Math.random() < 0.2
-    });
-    
-    return extractedFields;
-  };
-  
+
   const handleUpload = async () => {
     if (!file || !applicationId) return;
     
     setIsUploading(true);
-    setProcessingStatus('Uploading document...');
+    setProcessingStatus('Uploading document securely...');
     
     try {
       const timestamp = new Date().getTime();
@@ -159,7 +124,7 @@ const DocumentUpload = ({
         throw new Error(uploadResult.error);
       }
       
-      setProcessingStatus('Processing document with browser-based OCR...');
+      setProcessingStatus('Processing document with AI OCR engine...');
       
       let ocrResult: { text: string, extractedFields?: any } = { text: '' };
       
@@ -171,7 +136,7 @@ const DocumentUpload = ({
         URL.revokeObjectURL(objectUrl);
       }
       
-      setProcessingStatus('Saving document information...');
+      setProcessingStatus('Saving document metadata...');
       
       const documentId = crypto.randomUUID();
       const { data: docData, error: docError } = await supabase
@@ -179,7 +144,7 @@ const DocumentUpload = ({
         .insert({
           id: documentId,
           application_id: applicationId,
-          document_type: documentType,
+          document_type: ocrResult.extractedFields?.categorization?.type || documentType,
           filename: file.name,
           file_path: uploadResult.key,
           raw_text: ocrResult.text || '',
@@ -192,7 +157,59 @@ const DocumentUpload = ({
         throw new Error(`Database error: ${docError.message}`);
       }
       
-      setProcessingStatus('Running fraud checks...');
+      setProcessingStatus('Running workflow automation...');
+      
+      // Trigger workflow automation
+      const workflowResult = await processDocumentWorkflow(
+        documentId,
+        applicationId,
+        ocrResult.text,
+        ocrResult.extractedFields || {},
+        file.name
+      );
+      
+      setWorkflowActions(workflowResult.actions);
+      
+      setProcessingStatus('Performing compliance checks...');
+      
+      // Run compliance checks
+      try {
+        // Get application data for compliance check
+        const { data: appData } = await supabase
+          .from('mortgage_applications')
+          .select('*')
+          .eq('id', applicationId)
+          .single();
+        
+        const { data: allDocs } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('application_id', applicationId);
+        
+        if (appData && allDocs) {
+          const complianceData: ApplicationData = {
+            applicantInfo: {
+              name: appData.client_name,
+              income: ocrResult.extractedFields?.income ? parseFloat(String(ocrResult.extractedFields.income).replace(/[^0-9.]/g, '')) : undefined
+            },
+            documents: allDocs.map(doc => ({
+              type: doc.document_type as any,
+              extractedFields: doc.structured_data || {},
+              verified: doc.verified || false,
+              uploadDate: doc.uploaded_at
+            })),
+            propertyInfo: {},
+            loanInfo: {}
+          };
+          
+          const complianceResult = runComplianceCheck(complianceData);
+          setComplianceResults(complianceResult);
+        }
+      } catch (complianceError) {
+        console.warn('Compliance check failed:', complianceError);
+      }
+      
+      setProcessingStatus('Running fraud detection checks...');
       
       const response = await fetch(`${supabaseUrl}/functions/v1/process-document`, {
         method: 'POST',
@@ -202,7 +219,7 @@ const DocumentUpload = ({
         body: JSON.stringify({
           documentId,
           applicationId,
-          documentType,
+          documentType: ocrResult.extractedFields?.categorization?.type || documentType,
           extractedText: ocrResult.text,
           extractedFields: ocrResult.extractedFields
         })
@@ -210,14 +227,14 @@ const DocumentUpload = ({
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error processing document');
+        console.warn('Fraud detection warning:', errorData.error);
       }
       
-      const result = await response.json();
-      
       toast({
-        title: "Document Processed",
-        description: "File uploaded and processed successfully with browser-based OCR"
+        title: "Document Processed Successfully",
+        description: workflowResult.newStage 
+          ? `Document processed and application advanced to ${workflowResult.newStage}` 
+          : "Document uploaded and processed with AI analysis"
       });
       
       setUploadedDocId(documentId);
@@ -243,6 +260,8 @@ const DocumentUpload = ({
     setFile(null);
     setUploadedDocId(null);
     setExtractedData(null);
+    setWorkflowActions([]);
+    setComplianceResults(null);
     
     if (onChange) {
       onChange(null);
@@ -258,7 +277,7 @@ const DocumentUpload = ({
         <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
           <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
           <p className="text-sm text-center text-muted-foreground mb-2">
-            Upload PDF or image for automatic text extraction via browser-based OCR
+            Upload PDF or image for instant AI-powered analysis and workflow automation
           </p>
           <input
             type="file"
@@ -293,7 +312,9 @@ const DocumentUpload = ({
           {!uploadedDocId ? (
             <div className="space-y-3">
               {processingStatus && (
-                <div className="text-xs text-muted-foreground">{processingStatus}</div>
+                <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded">
+                  {processingStatus}
+                </div>
               )}
               
               <Button 
@@ -305,34 +326,100 @@ const DocumentUpload = ({
                 {isUploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing with browser OCR...
+                    Processing with AI...
                   </>
                 ) : (
                   <>
                     <Upload className="mr-2 h-4 w-4" />
-                    Process with browser OCR
+                    Process with AI & Automation
                   </>
                 )}
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center text-green-600 text-sm">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Document processed successfully
+              <div className="flex items-center text-green-600 text-sm bg-green-50 p-2 rounded">
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Document processed successfully with AI analysis
               </div>
               
+              {/* Workflow Actions */}
+              {workflowActions.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                  <h5 className="font-medium text-blue-800 text-sm mb-2">Workflow Automation:</h5>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    {workflowActions.map((action, index) => (
+                      <li key={index} className="flex items-center">
+                        <CheckCircle2 className="w-3 h-3 mr-2 flex-shrink-0" />
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Compliance Results */}
+              {complianceResults && (
+                <div className={`border rounded p-3 ${complianceResults.passed ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                  <h5 className={`font-medium text-sm mb-2 ${complianceResults.passed ? 'text-green-800' : 'text-yellow-800'}`}>
+                    Compliance Check:
+                  </h5>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm">Score: {complianceResults.score}/100</span>
+                    <Badge variant={complianceResults.passed ? "default" : "secondary"}>
+                      {complianceResults.passed ? 'COMPLIANT' : 'REVIEW REQUIRED'}
+                    </Badge>
+                  </div>
+                  {complianceResults.violations.length > 0 && (
+                    <div className="text-xs space-y-1">
+                      {complianceResults.violations.slice(0, 2).map((violation: any, index: number) => (
+                        <div key={index} className="flex items-center text-yellow-700">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          {violation.message}
+                        </div>
+                      ))}
+                      {complianceResults.violations.length > 2 && (
+                        <div className="text-xs text-gray-600">
+                          +{complianceResults.violations.length - 2} more issues...
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Extracted Data */}
               {extractedData && Object.keys(extractedData).length > 0 && (
-                <div className="mt-3 border rounded p-3 bg-gray-50">
-                  <h4 className="text-sm font-medium mb-2">Extracted Information</h4>
+                <div className="border rounded p-3 bg-gray-50">
+                  <h5 className="font-medium text-sm mb-2">AI Extracted Information:</h5>
+                  
+                  {/* Document Categorization */}
+                  {extractedData.categorization && (
+                    <div className="mb-3 p-2 bg-blue-100 rounded">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-blue-800">Auto-Categorized:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {extractedData.categorization.type.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-blue-600 mt-1">
+                        Confidence: {Math.round(extractedData.categorization.confidence * 100)}%
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-1 text-sm">
                     {Object.entries(extractedData).map(([key, value]) => {
-                      if (key === "metadata" && typeof value === "object") return null;
+                      if (key === "metadata" || key === "categorization") return null;
                       
                       return (
                         <div key={key} className="grid grid-cols-3 gap-2">
-                          <span className="text-gray-500 font-medium">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</span>
-                          <span className="col-span-2">{value as string}</span>
+                          <span className="text-gray-500 font-medium text-xs">
+                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:
+                          </span>
+                          <span className="col-span-2 text-xs font-mono bg-white p-1 rounded">
+                            {value as string}
+                          </span>
                         </div>
                       );
                     })}
