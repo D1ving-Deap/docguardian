@@ -1,347 +1,551 @@
-
-import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { FileUp, FileText, X, Loader2, Upload, CheckCircle2 } from "lucide-react";
-import { supabase, supabaseUrl } from "@/integrations/supabase/client";
-import storage from '@/utils/supabaseStorage';
+import React, { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  Upload, 
+  FileText, 
+  CheckCircle, 
+  AlertCircle, 
+  XCircle, 
+  Eye,
+  Download,
+  Trash2,
+  Shield,
+  Clock,
+  User,
+  Building,
+  CreditCard,
+  FileCheck,
+  AlertTriangle,
+  Info
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { performOCR, extractFieldsFromText } from '@/utils/ocrService';
+import { categorizeDocument, validateExtractedFields } from '@/utils/documentCategorization';
+import { processDocumentAndTriggerWorkflow, createMortgageApplication } from '@/utils/workflowAutomation';
+import { runComplianceCheck, generateComplianceReport } from '@/utils/complianceEngine';
+import { DocumentType } from '@/utils/types/ocrTypes';
+import { MortgageApplication, ApplicationDocument } from '@/utils/workflowAutomation';
 
-interface DocumentUploadProps {
-  label: string;
-  description?: string;
-  acceptTypes?: string;
-  documentType: string;
-  applicationId: string;
-  onChange?: (documentId: string | null, extractedData?: any) => void;
+interface UploadedDocument {
+  id: string;
+  file: File;
+  preview: string;
+  status: 'uploading' | 'processing' | 'completed' | 'error';
+  progress: number;
+  ocrResult?: any;
+  extractedFields?: Record<string, any>;
+  documentType?: DocumentType;
+  confidence?: number;
+  issues?: string[];
+  isVerified?: boolean;
+  verificationNotes?: string;
 }
 
-const DocumentUpload = ({ 
-  label, 
-  description, 
-  acceptTypes = "application/pdf,image/jpeg,image/png,image/tiff", 
-  documentType,
+interface DocumentUploadProps {
+  applicationId?: string;
+  onDocumentProcessed?: (document: ApplicationDocument) => void;
+  onApplicationUpdated?: (application: MortgageApplication) => void;
+}
+
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
   applicationId,
-  onChange 
-}: DocumentUploadProps) => {
+  onDocumentProcessed,
+  onApplicationUpdated
+}) => {
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
+  const [currentApplication, setCurrentApplication] = useState<MortgageApplication | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [complianceResult, setComplianceResult] = useState<any>(null);
   const { toast } = useToast();
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [processingStatus, setProcessingStatus] = useState<string>('');
-  const [uploadedDocId, setUploadedDocId] = useState<string | null>(null);
-  const [extractedData, setExtractedData] = useState<any>(null);
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      
-      if (selectedFile.size > 50 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Maximum file size is 50MB",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      if (!selectedFile.type.includes('pdf') && 
-          !selectedFile.type.includes('image/')) {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF file or image (JPG, PNG, TIFF)",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setFile(selectedFile);
-    }
-  };
-  
-  const extractTextWithTesseract = async (imageUrl: string): Promise<{ text: string, extractedFields?: any }> => {
-    setProcessingStatus('Initializing OCR engine...');
-    
-    try {
-      // Convert URL to File object for processing
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'document.png', { type: blob.type });
-      
-      setProcessingStatus('Reading document text...');
-      
-      // Use the WASM-based OCR engine
-      const result = await performOCR(file, (progress) => {
-        setProcessingStatus(`Processing document: ${Math.round(progress * 100)}%`);
+
+  // Initialize application if not provided
+  React.useEffect(() => {
+    if (!currentApplication && !applicationId) {
+      const newApplication = createMortgageApplication({
+        applicantName: 'New Applicant',
+        email: 'applicant@example.com',
+        phone: '(555) 123-4567',
+        propertyAddress: '123 Main St, Toronto, ON',
+        purchasePrice: 500000,
+        downPayment: 50000,
+        loanAmount: 450000
       });
-      
-      setProcessingStatus('Extracting data from text...');
-      
-      const extractedFields = extractFieldsFromText(result.text, documentType);
-      
-      return { 
-        text: result.text,
-        extractedFields
-      };
-    } catch (error) {
-      console.error('OCR error:', error);
-      throw new Error('Failed to extract text from document');
+      setCurrentApplication(newApplication);
     }
-  };
-  
-  const extractFieldsFromText = (text: string, docType: string): any => {
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const extractedFields: Record<string, string | { processed: string; confidence: number; edited: boolean }> = {};
-    
-    if (docType.toLowerCase().includes('income') || docType.toLowerCase().includes('pay')) {
-      const incomeRegex = /\$?(\d{1,3}(,\d{3})*(\.\d{2})?)/g;
-      const incomeMatches = text.match(incomeRegex);
+  }, [applicationId, currentApplication]);
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const newDocuments: UploadedDocument[] = acceptedFiles.map(file => ({
+      id: crypto.randomUUID(),
+      file,
+      preview: URL.createObjectURL(file),
+      status: 'uploading',
+      progress: 0
+    }));
+
+    setUploadedDocuments(prev => [...prev, ...newDocuments]);
+
+    // Process each document
+    for (const doc of newDocuments) {
+      await processDocument(doc);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff'],
+      'application/pdf': ['.pdf']
+    },
+    multiple: true
+  });
+
+  const processDocument = async (document: UploadedDocument) => {
+    try {
+      // Update status to processing
+      setUploadedDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id 
+            ? { ...doc, status: 'processing', progress: 10 }
+            : doc
+        )
+      );
+
+      // Perform OCR
+      const ocrResult = await performOCR(document.file);
       
-      if (incomeMatches && incomeMatches.length > 0) {
-        extractedFields.income = incomeMatches[0];
-      }
+      setUploadedDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id 
+            ? { ...doc, progress: 40, ocrResult }
+            : doc
+        )
+      );
+
+      // Extract fields from OCR text
+      const extractedFields = await extractFieldsFromText(ocrResult.text, document.file.name);
       
-      const dateRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
-      const dateMatches = text.match(dateRegex);
+      setUploadedDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id 
+            ? { ...doc, progress: 60, extractedFields }
+            : doc
+        )
+      );
+
+      // Categorize document
+      const categorization = categorizeDocument(ocrResult.text, document.file.name);
       
-      if (dateMatches && dateMatches.length > 0) {
-        extractedFields.statementDate = dateMatches[0];
-      }
-    } 
-    else if (docType.toLowerCase().includes('id') || docType.toLowerCase().includes('license')) {
-      for (const line of lines) {
-        if (line.toLowerCase().includes('name:')) {
-          extractedFields.name = line.split(':')[1]?.trim() || '';
-          break;
+      setUploadedDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id 
+            ? { 
+                ...doc, 
+                progress: 80, 
+                documentType: categorization.type,
+                confidence: categorization.confidence,
+                issues: categorization.reasons
+              }
+            : doc
+        )
+      );
+
+      // Validate extracted fields
+      const validation = validateExtractedFields(extractedFields, categorization.type);
+
+      // Create application document
+      const applicationDocument: ApplicationDocument = {
+        id: document.id,
+        type: categorization.type,
+        filename: document.file.name,
+        uploadedAt: new Date(),
+        processedAt: new Date(),
+        extractedFields,
+        confidence: categorization.confidence,
+        issues: validation.missingFields,
+        isVerified: validation.isComplete,
+        verificationNotes: validation.isComplete ? 'All required fields extracted' : `Missing: ${validation.missingFields.join(', ')}`
+      };
+
+      // Update document status
+      setUploadedDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id 
+            ? { 
+                ...doc, 
+                status: 'completed', 
+                progress: 100,
+                isVerified: validation.isComplete,
+                verificationNotes: applicationDocument.verificationNotes
+              }
+            : doc
+        )
+      );
+
+      // Process workflow automation if application exists
+      if (currentApplication) {
+        const { updatedApplication, triggeredActions } = processDocumentAndTriggerWorkflow(
+          currentApplication,
+          applicationDocument
+        );
+
+        setCurrentApplication(updatedApplication);
+
+        // Run compliance check
+        const compliance = runComplianceCheck(updatedApplication);
+        setComplianceResult(compliance);
+
+        // Notify parent components
+        onDocumentProcessed?.(applicationDocument);
+        onApplicationUpdated?.(updatedApplication);
+
+        // Show notifications for triggered actions
+        if (triggeredActions.length > 0) {
+          toast({
+            title: "Workflow Automation Triggered",
+            description: `${triggeredActions.length} automation rules were triggered`,
+          });
+        }
+
+        // Show compliance status
+        if (compliance.overallStatus === 'non_compliant') {
+          toast({
+            title: "Compliance Issues Detected",
+            description: `${compliance.summary.failed} compliance checks failed`,
+            variant: "destructive",
+          });
+        } else if (compliance.overallStatus === 'needs_review') {
+          toast({
+            title: "Compliance Review Required",
+            description: `${compliance.summary.warnings} warnings detected`,
+            variant: "default",
+          });
         }
       }
-      
-      const dobRegex = /\b(0?[1-9]|1[0-2])[\/](0?[1-9]|[12]\d|3[01])[\/](19|20)\d{2}\b/g;
-      const dobMatches = text.match(dobRegex);
-      
-      if (dobMatches && dobMatches.length > 0) {
-        extractedFields.dateOfBirth = dobMatches[0];
-      }
-      
-      const idRegex = /\b[A-Z0-9]{6,15}\b/g;
-      const idMatches = text.match(idRegex);
-      
-      if (idMatches && idMatches.length > 0) {
-        extractedFields.idNumber = idMatches[0];
-      }
-    }
-    
-    extractedFields.metadata = JSON.stringify({
-      processed: new Date().toISOString(),
-      confidence: Math.random() * 100,
-      edited: Math.random() < 0.2
-    });
-    
-    return extractedFields;
-  };
-  
-  const handleUpload = async () => {
-    if (!file || !applicationId) return;
-    
-    setIsUploading(true);
-    setProcessingStatus('Uploading document...');
-    
-    try {
-      const timestamp = new Date().getTime();
-      const safeName = encodeURIComponent(file.name.replace(/[^a-zA-Z0-9.-]/g, '_'));
-      const filePath = `${applicationId}/${documentType}/${timestamp}_${safeName}`;
-      const uploadResult = await storage.uploadFile(
-        file,
-        'applications',
-        filePath
+
+    } catch (error) {
+      console.error('Error processing document:', error);
+      setUploadedDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id 
+            ? { ...doc, status: 'error', progress: 0 }
+            : doc
+        )
       );
-      
-      if ('error' in uploadResult) {
-        throw new Error(uploadResult.error);
-      }
-      
-      setProcessingStatus('Processing document with browser-based OCR...');
-      
-      let ocrResult: { text: string, extractedFields?: any } = { text: '' };
-      
-      const objectUrl = URL.createObjectURL(file);
-      
-      try {
-        ocrResult = await extractTextWithTesseract(objectUrl);
-      } finally {
-        URL.revokeObjectURL(objectUrl);
-      }
-      
-      setProcessingStatus('Saving document information...');
-      
-      const documentId = crypto.randomUUID();
-      const { data: docData, error: docError } = await supabase
-        .from('documents')
-        .insert({
-          id: documentId,
-          application_id: applicationId,
-          document_type: documentType,
-          filename: file.name,
-          file_path: uploadResult.key,
-          raw_text: ocrResult.text || '',
-          structured_data: ocrResult.extractedFields || {}
-        })
-        .select();
-      
-      if (docError) {
-        console.error('Error storing document metadata:', docError);
-        throw new Error(`Database error: ${docError.message}`);
-      }
-      
-      setProcessingStatus('Running fraud checks...');
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/process-document`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          documentId,
-          applicationId,
-          documentType,
-          extractedText: ocrResult.text,
-          extractedFields: ocrResult.extractedFields
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error processing document');
-      }
-      
-      const result = await response.json();
-      
+
       toast({
-        title: "Document Processed",
-        description: "File uploaded and processed successfully with browser-based OCR"
+        title: "Processing Error",
+        description: `Failed to process ${document.file.name}`,
+        variant: "destructive",
       });
-      
-      setUploadedDocId(documentId);
-      setExtractedData(ocrResult.extractedFields);
-      
-      if (onChange) {
-        onChange(documentId, ocrResult.extractedFields);
-      }
-    } catch (error: any) {
-      console.error('Document processing error:', error);
-      toast({
-        title: "Processing Failed",
-        description: error.message || "Failed to process document",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUploading(false);
-      setProcessingStatus('');
     }
   };
-  
-  const handleRemove = async () => {
-    setFile(null);
-    setUploadedDocId(null);
-    setExtractedData(null);
-    
-    if (onChange) {
-      onChange(null);
+
+  const removeDocument = (documentId: string) => {
+    setUploadedDocuments(prev => prev.filter(doc => doc.id !== documentId));
+  };
+
+  const getDocumentIcon = (type?: DocumentType) => {
+    switch (type) {
+      case 'mortgage_application':
+        return <FileText className="h-4 w-4" />;
+      case 'income_proof':
+        return <CreditCard className="h-4 w-4" />;
+      case 'bank_statement':
+        return <Building className="h-4 w-4" />;
+      case 'identification':
+        return <User className="h-4 w-4" />;
+      case 'tax_document':
+        return <FileCheck className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
     }
   };
-  
+
+  const getStatusIcon = (status: UploadedDocument['status']) => {
+    switch (status) {
+      case 'uploading':
+        return <Clock className="h-4 w-4 text-blue-500" />;
+      case 'processing':
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'error':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+    }
+  };
+
+  const getDocumentTypeColor = (type?: DocumentType) => {
+    switch (type) {
+      case 'mortgage_application':
+        return 'bg-blue-100 text-blue-800';
+      case 'income_proof':
+        return 'bg-green-100 text-green-800';
+      case 'bank_statement':
+        return 'bg-purple-100 text-purple-800';
+      case 'identification':
+        return 'bg-orange-100 text-orange-800';
+      case 'tax_document':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
-    <div className="space-y-2">
-      <div className="font-medium text-sm">{label}</div>
-      {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      
-      {!file ? (
-        <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center">
-          <FileUp className="h-8 w-8 text-muted-foreground mb-2" />
-          <p className="text-sm text-center text-muted-foreground mb-2">
-            Upload PDF or image for automatic text extraction via browser-based OCR
-          </p>
-          <input
-            type="file"
-            accept={acceptTypes}
-            onChange={handleFileChange}
-            className="hidden"
-            id={`file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`}
-          />
-          <label htmlFor={`file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`}>
-            <Button variant="outline" size="sm" className="cursor-pointer" asChild>
-              <span>Choose File</span>
-            </Button>
-          </label>
-        </div>
-      ) : (
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center">
-              <FileText className="h-5 w-5 mr-2 text-blue-500" />
-              <span className="font-medium text-sm truncate max-w-[200px]">{file.name}</span>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleRemove}
-              disabled={isUploading}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Document Upload & Processing
+          </CardTitle>
+          <CardDescription>
+            Upload mortgage documents for AI-powered OCR extraction, categorization, and compliance checking
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+              isDragActive
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <p className="text-lg font-medium text-gray-900 mb-2">
+              {isDragActive ? 'Drop files here' : 'Drag & drop documents here'}
+            </p>
+            <p className="text-gray-500 mb-4">
+              or click to select files
+            </p>
+            <p className="text-sm text-gray-400">
+              Supports: PDF, PNG, JPG, JPEG, GIF, BMP, TIFF
+            </p>
           </div>
-          
-          {!uploadedDocId ? (
-            <div className="space-y-3">
-              {processingStatus && (
-                <div className="text-xs text-muted-foreground">{processingStatus}</div>
-              )}
-              
-              <Button 
-                onClick={handleUpload} 
-                disabled={isUploading} 
-                className="w-full"
-                size="sm"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing with browser OCR...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Process with browser OCR
-                  </>
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center text-green-600 text-sm">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Document processed successfully
-              </div>
-              
-              {extractedData && Object.keys(extractedData).length > 0 && (
-                <div className="mt-3 border rounded p-3 bg-gray-50">
-                  <h4 className="text-sm font-medium mb-2">Extracted Information</h4>
-                  <div className="space-y-1 text-sm">
-                    {Object.entries(extractedData).map(([key, value]) => {
-                      if (key === "metadata" && typeof value === "object") return null;
-                      
-                      return (
-                        <div key={key} className="grid grid-cols-3 gap-2">
-                          <span className="text-gray-500 font-medium">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</span>
-                          <span className="col-span-2">{value as string}</span>
+        </CardContent>
+      </Card>
+
+      {uploadedDocuments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Processing Results
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="documents" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsTrigger value="compliance">Compliance</TabsTrigger>
+                <TabsTrigger value="workflow">Workflow</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="documents" className="space-y-4">
+                <ScrollArea className="h-96">
+                  {uploadedDocuments.map((document) => (
+                    <div key={document.id} className="border rounded-lg p-4 mb-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="flex-shrink-0">
+                            {getDocumentIcon(document.documentType)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-medium text-sm truncate">
+                                {document.file.name}
+                              </h4>
+                              {getStatusIcon(document.status)}
+                              {document.documentType && (
+                                <Badge className={getDocumentTypeColor(document.documentType)}>
+                                  {document.documentType.replace('_', ' ')}
+                                </Badge>
+                              )}
+                              {document.isVerified && (
+                                <Badge className="bg-green-100 text-green-800">
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <Progress value={document.progress} className="mb-2" />
+                            
+                            {document.confidence && (
+                              <p className="text-sm text-gray-600">
+                                Confidence: {Math.round(document.confidence * 100)}%
+                              </p>
+                            )}
+                            
+                            {document.issues && document.issues.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-sm text-red-600 font-medium">Issues:</p>
+                                <ul className="text-sm text-red-600">
+                                  {document.issues.map((issue, index) => (
+                                    <li key={index}>• {issue}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            
+                            {document.verificationNotes && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                {document.verificationNotes}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      );
-                    })}
+                        
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(document.preview, '_blank')}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeDocument(document.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="compliance" className="space-y-4">
+                {complianceResult ? (
+                  <div className="space-y-4">
+                    <Alert className={complianceResult.overallStatus === 'compliant' ? 'border-green-200 bg-green-50' : 
+                                     complianceResult.overallStatus === 'non_compliant' ? 'border-red-200 bg-red-50' : 
+                                     'border-yellow-200 bg-yellow-50'}>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Overall Status:</strong> {complianceResult.overallStatus.toUpperCase()}
+                        <br />
+                        <strong>Summary:</strong> {complianceResult.summary.passed} passed, {complianceResult.summary.failed} failed, {complianceResult.summary.warnings} warnings
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {Object.entries(complianceResult.checks.reduce((acc, check) => {
+                        if (!acc[check.type]) acc[check.type] = [];
+                        acc[check.type].push(check);
+                        return acc;
+                      }, {} as Record<string, any[]>)).map(([regulatoryBody, checks]) => (
+                        <Card key={regulatoryBody}>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm">{regulatoryBody.toUpperCase()}</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {checks.map((check) => (
+                                <div key={check.id} className="flex items-center gap-2">
+                                  {check.status === 'passed' ? (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  ) : check.status === 'failed' ? (
+                                    <XCircle className="h-4 w-4 text-red-500" />
+                                  ) : (
+                                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                  )}
+                                  <span className="text-xs">{check.description}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Info className="h-12 w-12 mx-auto mb-4" />
+                    <p>Upload documents to see compliance results</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="workflow" className="space-y-4">
+                {currentApplication ? (
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Application Status</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Stage</p>
+                            <p className="text-lg font-semibold">{currentApplication.stage.replace('_', ' ')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Status</p>
+                            <p className="text-lg font-semibold">{currentApplication.status.replace('_', ' ')}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Next Actions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-2">
+                          {currentApplication.nextActions.map((action, index) => (
+                            <li key={index} className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-blue-500" />
+                              <span className="text-sm">{action}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    {currentApplication.blockers.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg text-red-600">Blockers</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-2">
+                            {currentApplication.blockers.map((blocker, index) => (
+                              <li key={index} className="flex items-center gap-2">
+                                <XCircle className="h-4 w-4 text-red-500" />
+                                <span className="text-sm">{blocker}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Info className="h-12 w-12 mx-auto mb-4" />
+                    <p>Upload documents to see workflow status</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
