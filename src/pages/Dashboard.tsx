@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -13,18 +12,28 @@ import ApplicationStageFlow from "@/components/dashboard/ApplicationStageFlow";
 const Dashboard = () => {
   const [activePage, setActivePage] = useState("overview");
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   
   useEffect(() => {
+    // Check for page parameter in URL
+    const pageParam = searchParams.get('page');
+    if (pageParam && ['overview', 'applications', 'application-stages', 'alerts', 'settings', 'clients'].includes(pageParam)) {
+      setActivePage(pageParam);
+      return;
+    }
+    
     // Extract the path without any query parameters
     const path = location.pathname.split('/').pop() || "";
     
     // Set active page based on current route
     if (path === "dashboard") {
       setActivePage("overview");
-    } else if (path) {
+    } else if (path && ['overview', 'applications', 'application-stages', 'alerts', 'settings', 'clients'].includes(path)) {
       setActivePage(path);
+    } else {
+      setActivePage("overview");
     }
-  }, [location]);
+  }, [location, searchParams]);
 
   const renderActivePage = () => {
     switch (activePage) {

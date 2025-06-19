@@ -23,8 +23,8 @@ const Login = () => {
 
   const [isRecoveryModalOpen, setIsRecoveryModalOpen] = useState(false);
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
-  const [twoFactorSession, setTwoFactorSession] = useState<any>(null);
   const [currentEmail, setCurrentEmail] = useState<string>("");
+  const [currentPassword, setCurrentPassword] = useState<string>("");
 
   const from = location.state?.from?.pathname || "/dashboard";
 
@@ -55,6 +55,7 @@ const Login = () => {
   const handleLoginSubmit = async (email: string, password: string) => {
     setErrorMessage(null);
     setCurrentEmail(email);
+    setCurrentPassword(password);
     
     setLoading(true);
     try {
@@ -75,16 +76,31 @@ const Login = () => {
 
       // For demonstration purposes, randomly require 2FA
       // In a real application, this would be based on user configuration or your security policy
-      const shouldUse2FA = Math.random() > 0.5; 
+      const shouldUse2FA = Math.random() > 0.7; // Reduced probability for better UX
       
-      if (shouldUse2FA) {
-        setTwoFactorSession(data.session);
-        setIsTwoFactorModalOpen(true);
-        setLoading(false);
-        toast({
-          title: "Two-factor authentication required",
-          description: "A verification code has been sent to your email.",
+      if (shouldUse2FA && data.session) {
+        // Send 2FA code via email
+        const { error: otpError } = await supabase.auth.resend({
+          type: 'signup',
+          email: email,
         });
+        
+        if (otpError) {
+          console.error("Failed to send 2FA code:", otpError);
+          // Continue with normal login if 2FA fails
+          await signIn(email, password);
+          toast({
+            title: "Login successful",
+            description: "Redirecting to dashboard...",
+          });
+        } else {
+          setIsTwoFactorModalOpen(true);
+          setLoading(false);
+          toast({
+            title: "Two-factor authentication required",
+            description: "A verification code has been sent to your email.",
+          });
+        }
       } else {
         await signIn(email, password);
         toast({
@@ -151,7 +167,9 @@ const Login = () => {
 
   const handleTwoFactorVerify = async (code: string) => {
     try {
-      // In Supabase v2, we use verifyOtp method
+      setLoading(true);
+      
+      // Verify the OTP code
       const { error } = await supabase.auth.verifyOtp({
         email: currentEmail,
         token: code,
@@ -161,7 +179,7 @@ const Login = () => {
       if (error) throw error;
       
       // After successful 2FA verification, complete the sign-in
-      await signIn(currentEmail, ""); // Password not needed here as we already have the session
+      await signIn(currentEmail, currentPassword);
       
       toast({
         title: "Verification successful",
@@ -178,6 +196,8 @@ const Login = () => {
         variant: "destructive",
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -305,7 +325,7 @@ const Login = () => {
         isOpen={isTwoFactorModalOpen}
         onClose={() => setIsTwoFactorModalOpen(false)}
         onVerify={handleTwoFactorVerify}
-        session={twoFactorSession}
+        session={null}
         email={currentEmail}
       />
     </div>

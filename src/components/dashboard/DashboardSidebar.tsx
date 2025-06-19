@@ -1,8 +1,8 @@
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useSidebar } from "@/components/ui/sidebar";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BarChart3,
   FileText,
@@ -25,6 +25,8 @@ const DashboardSidebar = ({
 }: DashboardSidebarProps) => {
   const { open, setOpen } = useSidebar();
   const [isMobile, setIsMobile] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -72,6 +74,18 @@ const DashboardSidebar = ({
     },
   ];
 
+  const handlePageChange = (pageValue: string) => {
+    setActivePage(pageValue);
+    
+    // Update URL with page parameter
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('page', pageValue);
+    setSearchParams(newSearchParams);
+    
+    // Close mobile sidebar if open
+    if (isMobile) setOpen(false);
+  };
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full py-4">
       <div className="px-3 my-2">
@@ -82,10 +96,7 @@ const DashboardSidebar = ({
               key={item.value}
               variant={activePage === item.value ? "secondary" : "ghost"}
               className="w-full justify-start"
-              onClick={() => {
-                setActivePage(item.value);
-                if (isMobile) setOpen(false);
-              }}
+              onClick={() => handlePageChange(item.value)}
             >
               {item.icon}
               <span className="ml-3">{item.name}</span>
