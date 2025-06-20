@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import NavBar from "@/components/NavBar";
 import HeroSection from "@/components/HeroSection";
@@ -9,6 +8,9 @@ import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import MetadataDetection from "@/components/MetadataDetection";
+import AnimatedText from '@/components/AnimatedText';
+import Features from '@/components/Features';
+import FeatureShowcase from '@/components/FeatureShowcase';
 
 const Index: React.FC = () => {
   useEffect(() => {
@@ -19,11 +21,13 @@ const Index: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <NavBar />
-      <main>
+      <main className="flex-grow">
         <HeroSection />
         <MetadataDetection />
         <PainPoints />
         <HowItWorks />
+        <Features />
+        <FeatureShowcase />
         <WaitlistForm />
       </main>
       <Footer />

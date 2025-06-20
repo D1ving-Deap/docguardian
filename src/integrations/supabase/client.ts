@@ -9,7 +9,20 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJh
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-const originalClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const originalClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'docguardian-web',
+    },
+  },
+});
+
 export const supabase = originalClient as unknown as CustomSupabaseClient;
 
 // Export the URL for use in other components

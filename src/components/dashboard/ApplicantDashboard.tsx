@@ -26,11 +26,22 @@ import {
   MessageCircle,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Banknote,
+  Receipt
 } from 'lucide-react';
 import { MortgageApplication, ApplicationStage, ApplicationStatus } from '@/utils/workflowAutomation';
 import { DocumentType } from '@/utils/types/ocrTypes';
 import DocumentUpload from './DocumentUpload';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/components/ui/use-toast';
+import DocumentUploader from '@/components/workflow/ocr/DocumentUploader';
+import ExtractedFieldsDisplay from '@/components/workflow/ocr/ExtractedFieldsDisplay';
+import ProcessingStatus from '@/components/workflow/ocr/ProcessingStatus';
+import { cn } from '@/lib/utils';
 
 // Mock applicant data
 const mockApplicantApplication: MortgageApplication = {
@@ -82,9 +93,74 @@ const mockApplicantApplication: MortgageApplication = {
   ]
 };
 
+interface ApplicationData {
+  personalInfo: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    dateOfBirth: string;
+    ssn: string;
+  };
+  propertyInfo: {
+    propertyType: string;
+    propertyAddress: string;
+    purchasePrice: string;
+    downPayment: string;
+  };
+  financialInfo: {
+    annualIncome: string;
+    employmentStatus: string;
+    employerName: string;
+    creditScore: string;
+  };
+  documents: {
+    id: File | null;
+    income: File | null;
+    bankStatements: File | null;
+    taxReturns: File | null;
+  };
+}
+
 const ApplicantDashboard: React.FC = () => {
+  const { toast } = useToast();
   const [application, setApplication] = useState<MortgageApplication>(mockApplicantApplication);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [activeDocumentType, setActiveDocumentType] = useState<DocumentType>('income_proof');
+
+  const [applicationData, setApplicationData] = useState<ApplicationData>({
+    personalInfo: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      dateOfBirth: '',
+      ssn: ''
+    },
+    propertyInfo: {
+      propertyType: '',
+      propertyAddress: '',
+      purchasePrice: '',
+      downPayment: ''
+    },
+    financialInfo: {
+      annualIncome: '',
+      employmentStatus: '',
+      employerName: '',
+      creditScore: ''
+    },
+    documents: {
+      id: null,
+      income: null,
+      bankStatements: null,
+      taxReturns: null
+    }
+  });
+
+  const [applicationProgress, setApplicationProgress] = useState(35);
 
   // Calculate application progress
   const stageOrder: ApplicationStage[] = [
@@ -104,42 +180,40 @@ const ApplicantDashboard: React.FC = () => {
   const getStageColor = (stage: ApplicationStage) => {
     switch (stage) {
       case 'initial_submission':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
       case 'document_collection':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'document_review':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       case 'underwriting':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       case 'conditional_approval':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
       case 'final_approval':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'closing':
-        return 'bg-indigo-100 text-indigo-800';
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
       case 'funded':
-        return 'bg-emerald-100 text-emerald-800';
+        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
   const getStatusColor = (status: ApplicationStatus) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      case 'on_hold':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'completed':
-        return 'bg-emerald-100 text-emerald-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'on_hold':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
@@ -148,7 +222,7 @@ const ApplicantDashboard: React.FC = () => {
       case 'mortgage_application':
         return <FileText className="h-4 w-4" />;
       case 'income_proof':
-        return <DollarSign className="h-4 w-4" />;
+        return <Receipt className="h-4 w-4" />;
       case 'bank_statement':
         return <Shield className="h-4 w-4" />;
       case 'identification':
@@ -200,6 +274,107 @@ const ApplicantDashboard: React.FC = () => {
 
   const uploadedDocumentTypes = application.documents.map(doc => doc.type);
   const missingDocumentTypes = requiredDocumentTypes.filter(type => !uploadedDocumentTypes.includes(type));
+
+  const handleFileUpload = async (file: File, documentType: keyof ApplicationData['documents']) => {
+    setCurrentFile(file);
+    setIsProcessing(true);
+    
+    try {
+      // Mock OCR processing - replace with actual OCR service
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Mock extracted data based on document type
+      const mockExtractedData = {
+        documentType,
+        fields: {
+          name: 'John Doe',
+          dateOfBirth: '1990-01-01',
+          ssn: '123-45-6789',
+          address: '123 Main St, City, State 12345',
+          income: '$75,000',
+          employer: 'ABC Company'
+        },
+        confidence: 0.95
+      };
+      
+      setExtractedData(mockExtractedData);
+      
+      // Update application data with extracted information
+      if (documentType === 'id') {
+        setApplicationData(prev => ({
+          ...prev,
+          personalInfo: {
+            ...prev.personalInfo,
+            firstName: mockExtractedData.fields.name.split(' ')[0] || '',
+            lastName: mockExtractedData.fields.name.split(' ')[1] || '',
+            dateOfBirth: mockExtractedData.fields.dateOfBirth || '',
+            ssn: mockExtractedData.fields.ssn || ''
+          }
+        }));
+      } else if (documentType === 'income') {
+        setApplicationData(prev => ({
+          ...prev,
+          financialInfo: {
+            ...prev.financialInfo,
+            annualIncome: mockExtractedData.fields.income || '',
+            employerName: mockExtractedData.fields.employer || ''
+          }
+        }));
+      }
+      
+      toast({
+        title: "Document processed successfully",
+        description: `Information extracted from ${file.name}`,
+      });
+      
+    } catch (error) {
+      toast({
+        title: "Processing failed",
+        description: "Please try uploading the document again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      setCurrentFile(null);
+    }
+  };
+
+  const handleManualInput = (section: keyof ApplicationData, field: string, value: string) => {
+    setApplicationData(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSubmitApplication = async () => {
+    try {
+      // Mock API call to submit application
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Application submitted successfully",
+        description: "Your application has been submitted for review.",
+      });
+      
+      setApplicationProgress(100);
+    } catch (error) {
+      toast({
+        title: "Submission failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const navItems = [
+    { type: 'income_proof', label: 'Income Proof', icon: Receipt },
+    { type: 'bank_statement', label: 'Bank Statement', icon: Banknote },
+    { type: 'identification', label: 'Identification', icon: User },
+    { type: 'tax_document', label: 'Tax Document', icon: FileText },
+  ];
 
   return (
     <div className="space-y-6">
@@ -431,23 +606,38 @@ const ApplicantDashboard: React.FC = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="documents" className="space-y-6">
+        <TabsContent value="documents" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Upload Documents
-              </CardTitle>
+              <CardTitle>Document Center</CardTitle>
               <CardDescription>
-                Upload required documents for your mortgage application. Our AI will automatically extract and categorize the information.
+                Please upload the required documents for your application.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <DocumentUpload
-                applicationId={application.id}
-                onDocumentProcessed={handleDocumentProcessed}
-                onApplicationUpdated={handleApplicationUpdated}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6">
+                <nav className="flex flex-col space-y-2">
+                  {navItems.map((item) => (
+                    <Button
+                      key={item.type}
+                      variant={activeDocumentType === item.type ? 'secondary' : 'ghost'}
+                      className="w-full justify-start"
+                      onClick={() => setActiveDocumentType(item.type as DocumentType)}
+                    >
+                      <item.icon className="mr-2 h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  ))}
+                </nav>
+                <div>
+                  <DocumentUpload
+                    key={activeDocumentType}
+                    documentType={activeDocumentType}
+                    onDataExtracted={(data) => console.log('Extracted:', data)}
+                    onManualDataEntered={(data) => console.log('Manual:', data)}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

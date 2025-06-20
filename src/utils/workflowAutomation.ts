@@ -11,6 +11,18 @@ export type ApplicationStage =
   | 'closing'
   | 'funded';
 
+// Export the stages array for components to use
+export const MORTGAGE_STAGES: ApplicationStage[] = [
+  'initial_submission',
+  'document_collection',
+  'document_review',
+  'underwriting',
+  'conditional_approval',
+  'final_approval',
+  'closing',
+  'funded'
+];
+
 // Application status
 export type ApplicationStatus = 
   | 'pending'
@@ -383,10 +395,38 @@ export const createMortgageApplication = (
   };
 };
 
+/**
+ * Get workflow status for an application
+ */
+export const getWorkflowStatus = (application: MortgageApplication): {
+  currentStage: ApplicationStage;
+  progress: number;
+  nextStage?: ApplicationStage;
+  isComplete: boolean;
+  blockers: string[];
+} => {
+  const currentStageIndex = MORTGAGE_STAGES.indexOf(application.stage);
+  const progress = ((currentStageIndex + 1) / MORTGAGE_STAGES.length) * 100;
+  const nextStage = currentStageIndex < MORTGAGE_STAGES.length - 1 
+    ? MORTGAGE_STAGES[currentStageIndex + 1] 
+    : undefined;
+  const isComplete = application.stage === 'funded';
+  
+  return {
+    currentStage: application.stage,
+    progress: Math.round(progress),
+    nextStage,
+    isComplete,
+    blockers: application.blockers || []
+  };
+};
+
 export default {
   processDocumentAndTriggerWorkflow,
   advanceApplicationStage,
   getNextActionsForStage,
   checkRequiredDocumentsComplete,
-  createMortgageApplication
+  createMortgageApplication,
+  getWorkflowStatus,
+  MORTGAGE_STAGES
 }; 

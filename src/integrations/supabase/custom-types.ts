@@ -1,4 +1,3 @@
-
 import { Database as OriginalDatabase, Json } from './types';
 
 // Extend the Database type with our mortgage_applications and documents tables
@@ -141,4 +140,45 @@ export type CustomSupabaseClient = ReturnType<typeof createCustomClient>;
 import { createClient } from '@supabase/supabase-js';
 export function createCustomClient(supabaseUrl: string, supabaseKey: string) {
   return createClient<CustomDatabase>(supabaseUrl, supabaseKey);
+}
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  role: 'admin' | 'manager' | 'broker' | 'applicant';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Application {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  applicant_id: string;
+  broker_id?: string;
+  manager_id?: string;
+  status: string;
+  stage: string;
+  loan_amount?: number;
+  property_address?: string;
+  applicant?: { full_name: string; email: string };
+  broker?: { full_name: string };
+}
+
+export interface Client {
+  id: string;
+  created_at: string;
+  broker_id: string;
+  client_user_id: string;
+  client?: { full_name: string; email: string; };
 }

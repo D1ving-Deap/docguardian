@@ -1,552 +1,443 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Upload, 
   FileText, 
   CheckCircle, 
-  AlertCircle, 
-  XCircle, 
-  Eye,
-  Download,
-  Trash2,
-  Shield,
-  Clock,
-  User,
-  Building,
-  CreditCard,
-  FileCheck,
-  AlertTriangle,
-  Info
+  Edit,
+  Download
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { performOCR, extractFieldsFromText } from '@/utils/ocrService';
-import { categorizeDocument, validateExtractedFields } from '@/utils/documentCategorization';
-import { processDocumentAndTriggerWorkflow, createMortgageApplication } from '@/utils/workflowAutomation';
-import { runComplianceCheck, generateComplianceReport } from '@/utils/complianceEngine';
-import { DocumentType } from '@/utils/types/ocrTypes';
-import { MortgageApplication, ApplicationDocument } from '@/utils/workflowAutomation';
+import { useToast } from '@/components/ui/use-toast';
+import OCRService, { type ExtractedField } from '@/utils/ocrService';
+import { useAppData } from '@/contexts/AppDataContext';
+import { supabase } from '@/integrations/supabase/client';
 
-interface UploadedDocument {
-  id: string;
-  file: File;
-  preview: string;
-  status: 'uploading' | 'processing' | 'completed' | 'error';
-  progress: number;
-  ocrResult?: any;
-  extractedFields?: Record<string, any>;
-  documentType?: DocumentType;
-  confidence?: number;
-  issues?: string[];
-  isVerified?: boolean;
-  verificationNotes?: string;
+interface ExtractedData {
+  [key: string]: string;
 }
 
 interface DocumentUploadProps {
-  applicationId?: string;
-  onDocumentProcessed?: (document: ApplicationDocument) => void;
-  onApplicationUpdated?: (application: MortgageApplication) => void;
+  documentType: 'income_proof' | 'bank_statement' | 'identification' | 'tax_document' | 'mortgage_application' | 'generic';
+  onDataExtracted: (data: ExtractedData) => void;
+  onManualDataEntered: (data: ExtractedData) => void;
 }
 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({
-  applicationId,
-  onDocumentProcessed,
-  onApplicationUpdated
+  documentType,
+  onDataExtracted,
+  onManualDataEntered
 }) => {
-  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
-  const [currentApplication, setCurrentApplication] = useState<MortgageApplication | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [complianceResult, setComplianceResult] = useState<any>(null);
   const { toast } = useToast();
+  const { userProfile, createApplication } = useAppData();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [extractedData, setExtractedData] = useState<ExtractedData>({});
+  const [manualData, setManualData] = useState<ExtractedData>({});
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
 
-  // Initialize application if not provided
-  React.useEffect(() => {
-    if (!currentApplication && !applicationId) {
-      const newApplication = createMortgageApplication({
-        applicantName: 'New Applicant',
-        email: 'applicant@example.com',
-        phone: '(555) 123-4567',
-        propertyAddress: '123 Main St, Toronto, ON',
-        purchasePrice: 500000,
-        downPayment: 50000,
-        loanAmount: 450000
-      });
-      setCurrentApplication(newApplication);
-    }
-  }, [applicationId, currentApplication]);
+  const ocrServiceRef = useRef<OCRService | null>(null);
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const newDocuments: UploadedDocument[] = acceptedFiles.map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      preview: URL.createObjectURL(file),
-      status: 'uploading',
-      progress: 0
-    }));
-
-    setUploadedDocuments(prev => [...prev, ...newDocuments]);
-
-    // Process each document
-    for (const doc of newDocuments) {
-      await processDocument(doc);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff'],
-      'application/pdf': ['.pdf']
-    },
-    multiple: true
-  });
-
-  const processDocument = async (document: UploadedDocument) => {
-    try {
-      // Update status to processing
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === document.id 
-            ? { ...doc, status: 'processing', progress: 10 }
-            : doc
-        )
-      );
-
-      // Perform OCR
-      const ocrResult = await performOCR(document.file);
-      
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === document.id 
-            ? { ...doc, progress: 40, ocrResult }
-            : doc
-        )
-      );
-
-      // Extract fields from OCR text
-      const extractedFields = await extractFieldsFromText(ocrResult.text, document.file.name);
-      
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === document.id 
-            ? { ...doc, progress: 60, extractedFields }
-            : doc
-        )
-      );
-
-      // Categorize document
-      const categorization = categorizeDocument(ocrResult.text, document.file.name);
-      
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === document.id 
-            ? { 
-                ...doc, 
-                progress: 80, 
-                documentType: categorization.type,
-                confidence: categorization.confidence,
-                issues: categorization.reasons
-              }
-            : doc
-        )
-      );
-
-      // Validate extracted fields
-      const validation = validateExtractedFields(extractedFields, categorization.type);
-
-      // Create application document
-      const applicationDocument: ApplicationDocument = {
-        id: document.id,
-        type: categorization.type,
-        filename: document.file.name,
-        uploadedAt: new Date(),
-        processedAt: new Date(),
-        extractedFields,
-        confidence: categorization.confidence,
-        issues: validation.missingFields,
-        isVerified: validation.isComplete,
-        verificationNotes: validation.isComplete ? 'All required fields extracted' : `Missing: ${validation.missingFields.join(', ')}`
-      };
-
-      // Update document status
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === document.id 
-            ? { 
-                ...doc, 
-                status: 'completed', 
-                progress: 100,
-                isVerified: validation.isComplete,
-                verificationNotes: applicationDocument.verificationNotes
-              }
-            : doc
-        )
-      );
-
-      // Process workflow automation if application exists
-      if (currentApplication) {
-        const { updatedApplication, triggeredActions } = processDocumentAndTriggerWorkflow(
-          currentApplication,
-          applicationDocument
-        );
-
-        setCurrentApplication(updatedApplication);
-
-        // Run compliance check
-        const compliance = runComplianceCheck(updatedApplication);
-        setComplianceResult(compliance);
-
-        // Notify parent components
-        onDocumentProcessed?.(applicationDocument);
-        onApplicationUpdated?.(updatedApplication);
-
-        // Show notifications for triggered actions
-        if (triggeredActions.length > 0) {
-          toast({
-            title: "Workflow Automation Triggered",
-            description: `${triggeredActions.length} automation rules were triggered`,
-          });
-        }
-
-        // Show compliance status
-        if (compliance.overallStatus === 'non_compliant') {
-          toast({
-            title: "Compliance Issues Detected",
-            description: `${compliance.summary.failed} compliance checks failed`,
-            variant: "destructive",
-          });
-        } else if (compliance.overallStatus === 'needs_review') {
-          toast({
-            title: "Compliance Review Required",
-            description: `${compliance.summary.warnings} warnings detected`,
-            variant: "default",
-          });
+  useEffect(() => {
+    ocrServiceRef.current = new OCRService();
+    ocrServiceRef.current.initialize(
+      (m) => {
+        if (m.status === 'recognizing text') {
+          setProgress(Math.round(m.progress * 100));
+          setProgressMessage('Recognizing text...');
+        } else {
+          setProgressMessage(m.status);
         }
       }
+    );
 
-    } catch (error) {
-      console.error('Error processing document:', error);
-      setUploadedDocuments(prev => 
-        prev.map(doc => 
-          doc.id === document.id 
-            ? { ...doc, status: 'error', progress: 0 }
-            : doc
-        )
-      );
+    return () => {
+      ocrServiceRef.current?.terminate();
+    };
+  }, []);
+
+  // Document type configurations
+  const documentConfigs = {
+    income_proof: {
+      title: 'Income Proof',
+      description: 'Upload pay stubs, employment letters, or income verification documents',
+      fields: ['employer_name', 'job_title', 'annual_salary', 'employment_date', 'pay_frequency'],
+      fieldLabels: {
+        employer_name: 'Employer Name',
+        job_title: 'Job Title',
+        annual_salary: 'Annual Salary',
+        employment_date: 'Employment Date',
+        pay_frequency: 'Pay Frequency'
+      }
+    },
+    bank_statement: {
+      title: 'Bank Statement',
+      description: 'Upload recent bank statements for account verification',
+      fields: ['bank_name', 'account_number', 'account_balance', 'statement_date', 'account_type'],
+      fieldLabels: {
+        bank_name: 'Bank Name',
+        account_number: 'Account Number (Last 4 digits)',
+        account_balance: 'Account Balance',
+        statement_date: 'Statement Date',
+        account_type: 'Account Type'
+      }
+    },
+    identification: {
+      title: 'Identification',
+      description: 'Upload government-issued ID (driver\'s license, passport, etc.)',
+      fields: ['full_name', 'date_of_birth', 'id_number', 'expiry_date', 'issuing_authority'],
+      fieldLabels: {
+        full_name: 'Full Name',
+        date_of_birth: 'Date of Birth',
+        id_number: 'ID Number',
+        expiry_date: 'Expiry Date',
+        issuing_authority: 'Issuing Authority'
+      }
+    },
+    tax_document: {
+      title: 'Tax Document',
+      description: 'Upload tax returns or T4 slips',
+      fields: ['tax_year', 'total_income', 'employer_name', 'sin_number', 'filing_status'],
+      fieldLabels: {
+        tax_year: 'Tax Year',
+        total_income: 'Total Income',
+        employer_name: 'Employer Name',
+        sin_number: 'SIN Number (Last 4 digits)',
+        filing_status: 'Filing Status'
+      }
+    },
+    mortgage_application: {
+      title: 'Mortgage Application',
+      description: 'Upload completed mortgage application form',
+      fields: ['applicant_name', 'property_address', 'purchase_price', 'down_payment', 'loan_amount'],
+      fieldLabels: {
+        applicant_name: 'Applicant Name',
+        property_address: 'Property Address',
+        purchase_price: 'Purchase Price',
+        down_payment: 'Down Payment',
+        loan_amount: 'Loan Amount'
+      }
+    },
+    generic: {
+      title: 'Document',
+      description: 'Upload any other relevant document',
+      fields: [],
+      fieldLabels: {}
+    }
+  };
+
+  const config = documentConfigs[documentType];
+
+  const saveToSupabase = async (extractedData: ExtractedData, file: File) => {
+    if (!userProfile) {
+      throw new Error('User profile not loaded');
+    }
+
+    try {
+      // First, create or get the mortgage application
+      let applicationId = '';
+      if (userProfile.role === 'applicant') {
+        // Create a new mortgage application for applicants
+        const { data: appData, error: appError } = await supabase
+          .from('mortgage_applications')
+          .insert([{
+            client_name: userProfile.full_name || 'Unknown',
+            email: userProfile.email || '',
+            status: 'in_progress',
+            stage: 'Document Collection',
+            progress: 25
+          }])
+          .select()
+          .single();
+        
+        if (appError) throw appError;
+        applicationId = appData.id;
+      } else {
+        // For other roles, get the current application
+        const { data: apps, error: appError } = await supabase
+          .from('mortgage_applications')
+          .select('id')
+          .eq('email', userProfile.email)
+          .limit(1);
+        
+        if (appError) throw appError;
+        applicationId = apps?.[0]?.id || '';
+      }
+
+      if (!applicationId) {
+        throw new Error('No application found');
+      }
+
+      // Upload file to Supabase Storage
+      const fileName = `${Date.now()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Save document record
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .insert([{
+          application_id: applicationId,
+          document_type: documentType,
+          file_path: fileName,
+          filename: file.name,
+          raw_text: JSON.stringify(extractedData),
+          structured_data: extractedData,
+          verified: false
+        }])
+        .select()
+        .single();
+
+      if (docError) throw docError;
 
       toast({
-        title: "Processing Error",
-        description: `Failed to process ${document.file.name}`,
+        title: "Document saved successfully",
+        description: "Your document and extracted data have been saved to the database.",
+      });
+
+    } catch (error) {
+      console.error('Error saving to Supabase:', error);
+      toast({
+        title: "Error saving document",
+        description: "There was an error saving your document to the database.",
         variant: "destructive",
       });
+      throw error;
     }
   };
 
-  const removeDocument = (documentId: string) => {
-    setUploadedDocuments(prev => prev.filter(doc => doc.id !== documentId));
+  const handleProcessDocument = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0 || !ocrServiceRef.current) return;
+
+    const file = acceptedFiles[0];
+    setIsProcessing(true);
+    setUploadedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setProgress(0);
+    setExtractedData({});
+
+    try {
+      const { extractedFields } = await ocrServiceRef.current.analyzeDocument(file);
+      
+      const data: ExtractedData = extractedFields.reduce((acc, field) => {
+        acc[field.label.toLowerCase().replace(/\s+/g, '_')] = field.value;
+        return acc;
+      }, {} as ExtractedData);
+      
+      setExtractedData(data);
+      await saveToSupabase(data, file);
+      onDataExtracted(data);
+      
+      toast({
+        title: "Document processed successfully",
+        description: "OCR extraction completed. Please review the extracted data.",
+      });
+
+    } catch (error) {
+      console.error("OCR Processing Error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      toast({
+        title: "Processing failed",
+        description: `There was an error processing your document: ${errorMessage}. Please check the console for details.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [onDataExtracted, toast]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: handleProcessDocument,
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.bmp', '.tiff'],
+      'application/pdf': ['.pdf']
+    },
+    maxFiles: 1,
+    disabled: isProcessing
+  });
+
+  const handleManualDataSubmit = () => {
+    onManualDataEntered(manualData);
+    toast({
+      title: 'Manual data saved!',
+      description: 'Your manually entered data has been saved.',
+    });
   };
 
-  const getDocumentIcon = (type?: DocumentType) => {
-    switch (type) {
-      case 'mortgage_application':
-        return <FileText className="h-4 w-4" />;
-      case 'income_proof':
-        return <CreditCard className="h-4 w-4" />;
-      case 'bank_statement':
-        return <Building className="h-4 w-4" />;
-      case 'identification':
-        return <User className="h-4 w-4" />;
-      case 'tax_document':
-        return <FileCheck className="h-4 w-4" />;
-      default:
-        return <FileText className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusIcon = (status: UploadedDocument['status']) => {
-    switch (status) {
-      case 'uploading':
-        return <Clock className="h-4 w-4 text-blue-500" />;
-      case 'processing':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'error':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-    }
-  };
-
-  const getDocumentTypeColor = (type?: DocumentType) => {
-    switch (type) {
-      case 'mortgage_application':
-        return 'bg-blue-100 text-blue-800';
-      case 'income_proof':
-        return 'bg-green-100 text-green-800';
-      case 'bank_statement':
-        return 'bg-purple-100 text-purple-800';
-      case 'identification':
-        return 'bg-orange-100 text-orange-800';
-      case 'tax_document':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const handleFieldChange = (field: string, value: string) => {
+    setManualData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   return (
     <div className="space-y-6">
+      {/* Upload Area */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Document Upload & Processing
+            {config.title}
           </CardTitle>
-          <CardDescription>
-            Upload mortgage documents for AI-powered OCR extraction, categorization, and compliance checking
-          </CardDescription>
+          <CardDescription>{config.description}</CardDescription>
         </CardHeader>
         <CardContent>
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
               isDragActive
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 hover:border-gray-400'
+                ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                : 'border-muted-foreground/25 hover:border-primary/50 dark:border-muted-foreground/50 dark:hover:border-primary/50'
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-lg font-medium text-gray-900 mb-2">
-              {isDragActive ? 'Drop files here' : 'Drag & drop documents here'}
-            </p>
-            <p className="text-gray-500 mb-4">
-              or click to select files
-            </p>
-            <p className="text-sm text-gray-400">
-              Supports: PDF, PNG, JPG, JPEG, GIF, BMP, TIFF
-            </p>
+            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            {isDragActive ? (
+              <p className="text-lg font-medium">Drop the file here...</p>
+            ) : (
+              <div>
+                <p className="text-lg font-medium mb-2">Drag & drop a file here, or click to select</p>
+                <p className="text-sm text-muted-foreground">
+                  Supports PDF, JPG, PNG, and other image formats
+                </p>
+              </div>
+            )}
           </div>
+
+          {isProcessing && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{progressMessage || 'Processing...'}</span>
+                <span className="text-sm text-muted-foreground">{progress}%</span>
+              </div>
+              <Progress value={progress} className="w-full" />
+            </div>
+          )}
+
+          {uploadedFile && !isProcessing && (
+            <div className="mt-4 p-4 bg-muted/50 dark:bg-muted/20 rounded-lg">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-primary" />
+                <div className="flex-1">
+                  <p className="font-medium">{uploadedFile.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setUploadedFile(null);
+                    setPreviewUrl('');
+                    setExtractedData({});
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {uploadedDocuments.length > 0 && (
+      {/* Extracted Data */}
+      {Object.keys(extractedData).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Processing Results
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              Extracted Data
             </CardTitle>
+            <CardDescription>
+              Review and edit the automatically extracted information
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="documents" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="documents">Documents</TabsTrigger>
-                <TabsTrigger value="compliance">Compliance</TabsTrigger>
-                <TabsTrigger value="workflow">Workflow</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="documents" className="space-y-4">
-                <ScrollArea className="h-96">
-                  {uploadedDocuments.map((document) => (
-                    <div key={document.id} className="border rounded-lg p-4 mb-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className="flex-shrink-0">
-                            {getDocumentIcon(document.documentType)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-medium text-sm truncate">
-                                {document.file.name}
-                              </h4>
-                              {getStatusIcon(document.status)}
-                              {document.documentType && (
-                                <Badge className={getDocumentTypeColor(document.documentType)}>
-                                  {document.documentType.replace('_', ' ')}
-                                </Badge>
-                              )}
-                              {document.isVerified && (
-                                <Badge className="bg-green-100 text-green-800">
-                                  <Shield className="h-3 w-3 mr-1" />
-                                  Verified
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            <Progress value={document.progress} className="mb-2" />
-                            
-                            {document.confidence && (
-                              <p className="text-sm text-gray-600">
-                                Confidence: {Math.round(document.confidence * 100)}%
-                              </p>
-                            )}
-                            
-                            {document.issues && document.issues.length > 0 && (
-                              <div className="mt-2">
-                                <p className="text-sm text-red-600 font-medium">Issues:</p>
-                                <ul className="text-sm text-red-600">
-                                  {document.issues.map((issue, index) => (
-                                    <li key={index}>• {issue}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            
-                            {document.verificationNotes && (
-                              <p className="text-sm text-gray-600 mt-1">
-                                {document.verificationNotes}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(document.preview, '_blank')}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeDocument(document.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </ScrollArea>
-              </TabsContent>
-
-              <TabsContent value="compliance" className="space-y-4">
-                {complianceResult ? (
-                  <div className="space-y-4">
-                    <Alert className={complianceResult.overallStatus === 'compliant' ? 'border-green-200 bg-green-50' : 
-                                     complianceResult.overallStatus === 'non_compliant' ? 'border-red-200 bg-red-50' : 
-                                     'border-yellow-200 bg-yellow-50'}>
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        <strong>Overall Status:</strong> {complianceResult.overallStatus.toUpperCase()}
-                        <br />
-                        <strong>Summary:</strong> {complianceResult.summary.passed} passed, {complianceResult.summary.failed} failed, {complianceResult.summary.warnings} warnings
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {Object.entries(complianceResult.checks.reduce((acc, check) => {
-                        if (!acc[check.type]) acc[check.type] = [];
-                        acc[check.type].push(check);
-                        return acc;
-                      }, {} as Record<string, any[]>)).map(([regulatoryBody, checks]) => (
-                        <Card key={regulatoryBody}>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">{regulatoryBody.toUpperCase()}</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-2">
-                              {checks.map((check) => (
-                                <div key={check.id} className="flex items-center gap-2">
-                                  {check.status === 'passed' ? (
-                                    <CheckCircle className="h-4 w-4 text-green-500" />
-                                  ) : check.status === 'failed' ? (
-                                    <XCircle className="h-4 w-4 text-red-500" />
-                                  ) : (
-                                    <AlertCircle className="h-4 w-4 text-yellow-500" />
-                                  )}
-                                  <span className="text-xs">{check.description}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Info className="h-12 w-12 mx-auto mb-4" />
-                    <p>Upload documents to see compliance results</p>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="workflow" className="space-y-4">
-                {currentApplication ? (
-                  <div className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Application Status</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Stage</p>
-                            <p className="text-lg font-semibold">{currentApplication.stage.replace('_', ' ')}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-600">Status</p>
-                            <p className="text-lg font-semibold">{currentApplication.status.replace('_', ' ')}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Next Actions</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-2">
-                          {currentApplication.nextActions.map((action, index) => (
-                            <li key={index} className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-blue-500" />
-                              <span className="text-sm">{action}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-
-                    {currentApplication.blockers.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg text-red-600">Blockers</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {currentApplication.blockers.map((blocker, index) => (
-                              <li key={index} className="flex items-center gap-2">
-                                <XCircle className="h-4 w-4 text-red-500" />
-                                <span className="text-sm">{blocker}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Info className="h-12 w-12 mx-auto mb-4" />
-                    <p>Upload documents to see workflow status</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {config.fields.map((field) => (
+                <div key={field} className="space-y-2">
+                  <Label htmlFor={field} className="text-sm font-medium">
+                    {config.fieldLabels[field]}
+                  </Label>
+                  <Input
+                    id={field}
+                    value={extractedData[field] || ''}
+                    onChange={(e) => {
+                      const newData = { ...extractedData, [field]: e.target.value };
+                      setExtractedData(newData);
+                    }}
+                    className="bg-background border-border"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex gap-2">
+              <Button onClick={() => onDataExtracted(extractedData)}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Use Extracted Data
+              </Button>
+              <Button variant="outline" onClick={() => setExtractedData({})}>
+                Clear Data
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Manual Entry */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Edit className="h-5 w-5" />
+            Manual Data Entry
+          </CardTitle>
+          <CardDescription>
+            Enter information manually if you prefer not to upload documents
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {config.fields.map((field) => (
+              <div key={field} className="space-y-2">
+                <Label htmlFor={`manual-${field}`} className="text-sm font-medium">
+                  {config.fieldLabels[field]}
+                </Label>
+                <Input
+                  id={`manual-${field}`}
+                  value={manualData[field] || ''}
+                  onChange={(e) => {
+                    const newData = { ...manualData, [field]: e.target.value };
+                    setManualData(newData);
+                  }}
+                  className="bg-background border-border"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex gap-2">
+            <Button onClick={handleManualDataSubmit}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Save Manual Data
+            </Button>
+            <Button variant="outline" onClick={() => setManualData({})}>
+              Clear Data
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

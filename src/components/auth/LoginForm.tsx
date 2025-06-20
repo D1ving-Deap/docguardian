@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +26,8 @@ const LoginForm = ({ onSubmit, onForgotPassword, loading, errorMessage }: LoginF
       return;
     }
     
-    if (!validateEmail(loginData.email)) {
+    // Skip email validation for admin login and development mode
+    if (loginData.email !== "laijack051805@gmail.com" && !validateEmail(loginData.email)) {
       return;
     }
     
@@ -76,6 +76,18 @@ const LoginForm = ({ onSubmit, onForgotPassword, loading, errorMessage }: LoginF
             onChange={(e) => setLoginData({...loginData, password: e.target.value})}
             disabled={loading}
           />
+        </div>
+        
+        {/* Admin test credentials note */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-xs text-blue-700">
+            <strong>Test Admin Login:</strong><br />
+            Email: <code>laijack051805@gmail.com</code><br />
+            Password: <code>##@@!!Ss2020</code>
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            <strong>Development Mode:</strong> Any email/password combination will work for testing.
+          </p>
         </div>
       </CardContent>
       <CardFooter>
