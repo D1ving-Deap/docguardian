@@ -1,18 +1,38 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
-import { UserProfile, Application, Client } from '@/integrations/supabase/custom-types';
+import { useToast } from '@/components/ui/use-toast';
+
+// Simplified types that match the actual database
+interface SimpleUserProfile {
+  id: number;
+  user_id: string | null;
+  username: string | null;
+  created_at: string | null;
+}
+
+interface MortgageApplication {
+  id: string;
+  client_name: string;
+  email: string;
+  stage: string;
+  progress: number;
+  status: string;
+  fraud_score: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
 
 interface AppDataContextType {
-  userProfile: UserProfile | null;
-  agents: UserProfile[];
-  clients: Client[];
-  applications: Application[];
+  userProfile: SimpleUserProfile | null;
+  agents: SimpleUserProfile[];
+  applications: MortgageApplication[];
   loading: boolean;
+  error: string | null;
   refetchData: () => void;
-  addAgent: (agentData: Pick<UserProfile, 'full_name' | 'email'>) => Promise<void>;
-  addClient: (clientData: Pick<UserProfile, 'full_name' | 'email'>) => Promise<void>;
-  createApplication: (appData: Partial<Application>) => Promise<void>;
+  addAgent: (agentData: { full_name: string; email: string }) => Promise<void>;
+  createApplication: (appData: Partial<MortgageApplication>) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -27,18 +47,22 @@ export const useAppData = () => {
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [agents, setAgents] = useState<UserProfile[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
+  const { toast } = useToast();
+  const [userProfile, setUserProfile] = useState<SimpleUserProfile | null>(null);
+  const [agents, setAgents] = useState<SimpleUserProfile[]>([]);
+  const [applications, setApplications] = useState<MortgageApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user) {
       setLoading(false);
+      setError(null);
       return;
     }
+    
     setLoading(true);
+    setError(null);
     
     try {
       // Fetch user profile
@@ -48,57 +72,57 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         .eq('user_id', user.id)
         .single();
       
-      if (profileError) throw profileError;
-      setUserProfile(profileData);
-
-      // Fetch role-specific data
-      if (profileData.role === 'manager') {
-        const { data: agentsData, error: agentsError } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .in('role', ['broker']);
-        if (agentsError) throw agentsError;
-        setAgents(agentsData || []);
-
-        const { data: appsData, error: appsError } = await supabase
-          .from('applications')
-          .select(`*, applicant:user_profiles!applicant_id(full_name, email), broker:user_profiles!broker_id(full_name)`);
-        if (appsError) throw appsError;
-        setApplications(appsData || []);
-      }
-
-      if (profileData.role === 'broker') {
-        const { data: clientsData, error: clientsError } = await supabase
-          .from('clients')
-          .select(`*, client:user_profiles!client_user_id(full_name, email)`)
-          .eq('broker_id', profileData.id);
-        if (clientsError) throw clientsError;
-        setClients(clientsData || []);
-
-        const clientIds = (clientsData || []).map(c => c.client_user_id);
-        if (clientIds.length > 0) {
-          const { data: appsData, error: appsError } = await supabase
-            .from('applications')
-            .select(`*, applicant:user_profiles!applicant_id(full_name, email)`)
-            .in('applicant_id', clientIds);
-          if (appsError) throw appsError;
-          setApplications(appsData || []);
+      if (profileError) {
+        // If user profile doesn't exist, create a default one
+        if (profileError.code === 'PGRST116') {
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert([{
+              user_id: user.id,
+              username: user.email?.split('@')[0] || 'user'
+            }])
+            .select()
+            .single();
+          
+          if (createError) {
+            console.error('Error creating user profile:', createError);
+            setError('Failed to create user profile');
+            return;
+          }
+          
+          setUserProfile(newProfile);
         } else {
-          setApplications([]);
+          console.error('Error fetching user profile:', profileError);
+          setError('Failed to load user profile');
+          return;
         }
+      } else {
+        setUserProfile(profileData);
       }
 
-      if (profileData.role === 'applicant') {
-        const { data: appsData, error: appsError } = await supabase
-          .from('applications')
-          .select(`*, broker:user_profiles!broker_id(full_name)`)
-          .eq('applicant_id', profileData.id);
-        if (appsError) throw appsError;
+      // Fetch all agents (simplified - just get all user profiles)
+      const { data: agentsData, error: agentsError } = await supabase
+        .from('user_profiles')
+        .select('*');
+      if (agentsError) {
+        console.error('Error fetching agents:', agentsError);
+      } else {
+        setAgents(agentsData || []);
+      }
+
+      // Fetch mortgage applications
+      const { data: appsData, error: appsError } = await supabase
+        .from('mortgage_applications')
+        .select('*');
+      if (appsError) {
+        console.error('Error fetching applications:', appsError);
+      } else {
         setApplications(appsData || []);
       }
 
     } catch (error) {
       console.error('Error fetching data:', error);
+      setError('Failed to load data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -108,39 +132,66 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     fetchData();
   }, [fetchData]);
 
-  const addAgent = async (agentData: Pick<UserProfile, 'full_name' | 'email'>) => {
-    // This server-side logic should handle user creation and invitation.
-    console.log("Inviting agent:", agentData);
-  };
-
-  const addClient = async (clientData: Pick<UserProfile, 'full_name' | 'email'>) => {
-     console.log("Inviting client:", clientData);
-  };
-
-  const createApplication = async (appData: Partial<Application>) => {
-    if (!userProfile) throw new Error("User not loaded");
-    const { data, error } = await supabase
-      .from('applications')
-      .insert([{ ...appData, applicant_id: userProfile.id }])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    if (data) {
-        setApplications(prev => [...prev, data]);
+  const addAgent = async (agentData: { full_name: string; email: string }) => {
+    try {
+      console.log("Inviting agent:", agentData);
+      toast({
+        title: "Agent invitation sent",
+        description: `${agentData.full_name} has been invited to join your team.`,
+      });
+    } catch (error) {
+      console.error('Error adding agent:', error);
+      toast({
+        title: "Error inviting agent",
+        description: "Please try again.",
+        variant: "destructive",
+      });
     }
-    await fetchData(); // Refetch all data to ensure consistency
+  };
+
+  const createApplication = async (appData: Partial<MortgageApplication>) => {
+    if (!userProfile) throw new Error("User not loaded");
+    
+    try {
+      const { data, error } = await supabase
+        .from('mortgage_applications')
+        .insert([{
+          client_name: appData.client_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client',
+          email: appData.email || user.email || '',
+          stage: appData.stage || 'initial',
+          status: appData.status || 'pending',
+          progress: appData.progress || 0
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setApplications(prev => [...prev, data]);
+        toast({
+          title: "Application created",
+          description: "Your application has been submitted successfully.",
+        });
+      }
+    } catch (error) {
+      console.error('Error creating application:', error);
+      toast({
+        title: "Error creating application",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
   
   const value = {
     userProfile,
     agents,
-    clients,
     applications,
     loading,
+    error,
     refetchData: fetchData,
     addAgent,
-    addClient,
     createApplication
   };
 

@@ -14,15 +14,15 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Secret admin credentials for testing
+// Secret admin credentials for testing - only accessible in development
 const ADMIN_CREDENTIALS = {
   email: "laijack051805@gmail.com",
   password: "##@@!!Ss2020",
   name: "Admin Test User"
 };
 
-// Development mode flag - set to true to bypass Supabase completely
-const DEVELOPMENT_MODE = true;
+// Check if we're in development mode
+const isDevelopment = import.meta.env.DEV;
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -32,12 +32,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     console.log("Setting up auth state listener");
-    
-    if (DEVELOPMENT_MODE) {
-      console.log("Development mode: Skipping Supabase auth setup");
-      setIsLoading(false);
-      return;
-    }
     
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -77,8 +71,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Attempting sign in for:", email);
       
-      // Check for secret admin login
-      if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      // Check for secret admin login (only in development)
+      if (isDevelopment && email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
         console.log("Admin login detected");
         
         // Create a mock admin user
@@ -118,47 +112,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       
-      // In development mode, allow any email/password combination
-      if (DEVELOPMENT_MODE) {
-        console.log("Development mode: Creating mock user for:", email);
-        
-        const mockUser: User = {
-          id: `dev-user-${Date.now()}`,
-          email: email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          app_metadata: {
-            provider: 'email',
-            providers: ['email']
-          },
-          user_metadata: {
-            full_name: email.split('@')[0]
-          },
-          aud: 'authenticated',
-          role: 'authenticated'
-        } as User;
-        
-        const mockSession: Session = {
-          access_token: 'mock-dev-token',
-          refresh_token: 'mock-dev-refresh',
-          expires_in: 3600,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-          token_type: 'bearer',
-          user: mockUser
-        } as Session;
-        
-        setUser(mockUser);
-        setSession(mockSession);
-        
-        toast({
-          title: "Development login successful",
-          description: `Welcome ${email}`,
-        });
-        
-        return;
-      }
-      
-      // Regular Supabase authentication - with captcha disabled
+      // Regular Supabase authentication
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -217,26 +171,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Attempting sign up for:", email);
       
-      // For testing, allow admin user registration
-      if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
-        console.log("Admin registration detected");
-        toast({
-          title: "Admin account created",
-          description: "You can now log in with the admin credentials.",
-        });
-        return;
-      }
-      
-      // In development mode, allow any registration
-      if (DEVELOPMENT_MODE) {
-        console.log("Development mode: Creating mock account for:", email);
-        toast({
-          title: "Development account created",
-          description: "You can now log in with your credentials.",
-        });
-        return;
-      }
-      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -248,49 +182,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         console.error("Registration error:", error.message);
-        
-        // Handle captcha-related errors
-        if (error.message.includes('captcha') || error.message.includes('verification')) {
-          toast({
-            title: "Registration issue",
-            description: "Please try again or contact support if the issue persists.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Registration failed",
-            description: error.message,
-            variant: "destructive",
-          });
-        }
-        throw error;
-      }
-
-      // Check if email confirmation is required
-      if (data?.user?.identities?.length === 0) {
-        toast({
-          title: "Email already registered",
-          description: "This email is already registered. Please log in instead.",
-          variant: "destructive",
-        });
-        throw new Error("Email already registered");
-      }
-
-      console.log("Sign up successful:", data);
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account before logging in.",
-      });
-    } catch (error: any) {
-      console.error("Sign up error:", error);
-      // Don't show duplicate error messages
-      if (!error.message?.includes('captcha') && !error.message?.includes('verification')) {
         toast({
           title: "Registration failed",
           description: error.message,
           variant: "destructive",
         });
+        throw error;
       }
+
+      if (data.user && !data.session) {
+        toast({
+          title: "Registration successful",
+          description: "Please check your email to confirm your account.",
+        });
+      } else if (data.session) {
+        toast({
+          title: "Registration successful",
+          description: "Welcome! You have been signed in.",
+        });
+      }
+    } catch (error: any) {
+      console.error("Sign up error:", error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -300,27 +212,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       setIsLoading(true);
-      console.log("Attempting sign out");
-      
-      // Clear mock sessions
-      if (user?.id?.startsWith('admin-test-user') || user?.id?.startsWith('dev-user')) {
-        setUser(null);
-        setSession(null);
-        toast({
-          title: "Signed out successfully",
-        });
-        return;
-      }
-      
-      if (DEVELOPMENT_MODE) {
-        setUser(null);
-        setSession(null);
-        toast({
-          title: "Signed out successfully",
-        });
-        return;
-      }
-      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -333,13 +224,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
       
-      console.log("Sign out successful");
-    } catch (error: any) {
+      setUser(null);
+      setSession(null);
+      
       toast({
-        title: "Sign out failed",
-        description: error.message,
-        variant: "destructive",
+        title: "Signed out successfully",
       });
+    } catch (error: any) {
+      console.error("Sign out error:", error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
