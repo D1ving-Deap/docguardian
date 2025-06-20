@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,15 +7,17 @@ import { CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { validateEmail, validatePassword } from "@/utils/authUtils";
 import { useToast } from "@/components/ui/use-toast";
+import ReCAPTCHA from 'react-google-recaptcha';
 
 interface RegisterFormProps {
-  onSubmit: (fullName: string, email: string, password: string) => Promise<void>;
+  onSubmit: (fullName: string, email: string, password: string, captchaToken: string) => Promise<void>;
   loading: boolean;
   errorMessage: string | null;
   onTabChange: (tab: string) => void;
+  captchaSiteKey: string;
 }
 
-const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange }: RegisterFormProps) => {
+const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange, captchaSiteKey }: RegisterFormProps) => {
   const { toast } = useToast();
   const [registerData, setRegisterData] = useState({
     fullName: "",
@@ -26,6 +27,7 @@ const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange }: Register
   });
   
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +54,13 @@ const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange }: Register
       return;
     }
 
+    if (!captchaToken) {
+      setValidationError("Please complete the captcha challenge");
+      return;
+    }
+
     try {
-      await onSubmit(registerData.fullName, registerData.email, registerData.password);
+      await onSubmit(registerData.fullName, registerData.email, registerData.password, captchaToken);
       
       // Reset form after successful submission
       // The toast notification is now handled in the Login component
@@ -63,6 +70,7 @@ const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange }: Register
         password: "",
         confirmPassword: "",
       });
+      setCaptchaToken(null);
     } catch (error) {
       // Error handling is done in the Login component
     }
@@ -125,6 +133,13 @@ const RegisterForm = ({ onSubmit, loading, errorMessage, onTabChange }: Register
             value={registerData.confirmPassword}
             onChange={(e) => setRegisterData({...registerData, confirmPassword: e.target.value})}
             disabled={loading}
+          />
+        </div>
+        <div className="space-y-2">
+          <ReCAPTCHA
+            sitekey={captchaSiteKey}
+            onChange={setCaptchaToken}
+            theme="light"
           />
         </div>
       </CardContent>

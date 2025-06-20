@@ -14,6 +14,8 @@ import RegisterForm from "@/components/auth/RegisterForm";
 import PasswordRecoveryModal from "@/components/auth/PasswordRecoveryModal";
 import { getAuthErrorMessage, resendVerificationEmail } from "@/utils/authUtils";
 
+const CAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "YOUR_RECAPTCHA_SITE_KEY";
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,7 +53,7 @@ const Login: React.FC = () => {
     setErrorMessage(null);
   }, [activeTab]);
 
-  const handleLoginSubmit = async (email: string, password: string) => {
+  const handleLoginSubmit = async (email: string, password: string, captchaToken: string) => {
     setErrorMessage(null);
     setLoading(true);
     
@@ -117,7 +119,7 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleRegisterSubmit = async (fullName: string, email: string, password: string) => {
+  const handleRegisterSubmit = async (fullName: string, email: string, password: string, captchaToken: string) => {
     setErrorMessage(null);
     setLoading(true);
     
@@ -238,17 +240,19 @@ const Login: React.FC = () => {
                 <LoginForm 
                   onSubmit={handleLoginSubmit}
                   onForgotPassword={() => setIsRecoveryModalOpen(true)}
-                  loading={loading}
-                  errorMessage={errorMessage}
+                  loading={loading && activeTab === "login"}
+                  errorMessage={activeTab === "login" ? errorMessage : null}
+                  captchaSiteKey={CAPTCHA_SITE_KEY}
                 />
               </TabsContent>
               
               <TabsContent value="register" className="space-y-4">
                 <RegisterForm 
                   onSubmit={handleRegisterSubmit}
-                  loading={loading}
-                  errorMessage={errorMessage}
+                  loading={loading && activeTab === "register"}
+                  errorMessage={activeTab === "register" ? errorMessage : null}
                   onTabChange={setActiveTab}
+                  captchaSiteKey={CAPTCHA_SITE_KEY}
                 />
               </TabsContent>
             </Tabs>

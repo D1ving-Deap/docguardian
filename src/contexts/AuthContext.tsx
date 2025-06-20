@@ -124,8 +124,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Handle specific captcha-related errors
         if (error.message.includes('captcha') || error.message.includes('verification')) {
           toast({
-            title: "Authentication issue",
-            description: "Please try again or contact support if the issue persists.",
+            title: "Verification Required",
+            description: "Our system detected unusual activity. Please complete the captcha challenge if visible, or try again later. If this persists, check your network, try a different browser, or contact support.",
             variant: "destructive",
           });
         } else {

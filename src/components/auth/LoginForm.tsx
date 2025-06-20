@@ -6,19 +6,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CardContent, CardFooter } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { validateEmail } from "@/utils/authUtils";
+import ReCAPTCHA from 'react-google-recaptcha';
 
 interface LoginFormProps {
-  onSubmit: (email: string, password: string) => Promise<void>;
+  onSubmit: (email: string, password: string, captchaToken: string) => Promise<void>;
   onForgotPassword: () => void;
   loading: boolean;
   errorMessage: string | null;
+  captchaSiteKey: string;
 }
 
-const LoginForm = ({ onSubmit, onForgotPassword, loading, errorMessage }: LoginFormProps) => {
+const LoginForm = ({ onSubmit, onForgotPassword, loading, errorMessage, captchaSiteKey }: LoginFormProps) => {
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
   });
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +33,11 @@ const LoginForm = ({ onSubmit, onForgotPassword, loading, errorMessage }: LoginF
       return;
     }
     
-    await onSubmit(loginData.email, loginData.password);
+    if (!captchaToken) {
+      return;
+    }
+    
+    await onSubmit(loginData.email, loginData.password, captchaToken);
   };
 
   return (
@@ -74,6 +81,13 @@ const LoginForm = ({ onSubmit, onForgotPassword, loading, errorMessage }: LoginF
             value={loginData.password}
             onChange={(e) => setLoginData({...loginData, password: e.target.value})}
             disabled={loading}
+          />
+        </div>
+        <div className="space-y-2">
+          <ReCAPTCHA
+            sitekey={captchaSiteKey}
+            onChange={setCaptchaToken}
+            theme="light"
           />
         </div>
       </CardContent>
