@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export const validateEmail = (email: string): boolean => {
@@ -7,8 +6,8 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePassword = (password: string): string | null => {
-  if (password.length < 6) {
-    return "Password must be at least 6 characters long";
+  if (password.length < 12) {
+    return "Password must be at least 12 characters long";
   }
 
   const hasUpperCase = /[A-Z]/.test(password);
@@ -18,6 +17,25 @@ export const validatePassword = (password: string): string | null => {
   
   if (!(hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar)) {
     return "Password must contain uppercase, lowercase, numbers, and special characters";
+  }
+
+  // Check against common passwords
+  const commonPasswords = [
+    'password', '123456', 'qwerty', 'admin', 'letmein', 'welcome',
+    'monkey', 'dragon', 'master', 'football', 'baseball', 'shadow',
+    'michael', 'jennifer', 'thomas', 'jessica', 'joshua', 'michael',
+    'password123', 'admin123', 'root', 'toor', 'test', 'guest'
+  ];
+  
+  if (commonPasswords.includes(password.toLowerCase())) {
+    return "Password is too common. Please choose a more unique password";
+  }
+
+  // Check for sequential characters
+  const sequentialPatterns = ['123', 'abc', 'qwe', 'asd', 'zxc'];
+  const lowerPassword = password.toLowerCase();
+  if (sequentialPatterns.some(pattern => lowerPassword.includes(pattern))) {
+    return "Password contains sequential characters. Please choose a more secure password";
   }
 
   return null;

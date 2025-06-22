@@ -59,7 +59,7 @@ const Login: React.FC = () => {
     
     try {
       console.log("Attempting to sign in with:", email);
-      await signIn(email, password);
+      await signIn(email, password, captchaToken);
       
       toast({
         title: "Login successful",
@@ -125,7 +125,7 @@ const Login: React.FC = () => {
     
     try {
       console.log("Attempting to sign up with:", email);
-      await signUp(email, password, fullName);
+      await signUp(email, password, fullName, captchaToken);
       
       // Navigate to verification page
       navigate("/verify-email");

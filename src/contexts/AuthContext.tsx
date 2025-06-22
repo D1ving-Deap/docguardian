@@ -2,27 +2,18 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { useToast } from "@/components/ui/use-toast";
+import { env, isAdminLoginAllowed } from "@/config/environment";
 
 type AuthContextType = {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signIn: (email: string, password: string, captchaToken: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, captchaToken: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Secret admin credentials for testing - only accessible in development
-const ADMIN_CREDENTIALS = {
-  email: "laijack051805@gmail.com",
-  password: "##@@!!Ss2020",
-  name: "Admin Test User"
-};
-
-// Check if we're in development mode
-const isDevelopment = import.meta.env.DEV;
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -66,19 +57,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, [toast]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, captchaToken: string) => {
     try {
       setIsLoading(true);
       console.log("Attempting sign in for:", email);
       
-      // Check for secret admin login (only in development)
-      if (isDevelopment && email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      // Check for admin login (ONLY if enabled)
+      if (isAdminLoginAllowed() && 
+          email === env.admin.email && 
+          password === env.admin.password) {
         console.log("Admin login detected");
         
         // Create a mock admin user
         const mockUser: User = {
           id: 'admin-test-user',
-          email: ADMIN_CREDENTIALS.email,
+          email: env.admin.email,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           app_metadata: {
@@ -86,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             providers: ['email']
           },
           user_metadata: {
-            full_name: ADMIN_CREDENTIALS.name
+            full_name: env.admin.name
           },
           aud: 'authenticated',
           role: 'authenticated'
@@ -106,7 +99,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         toast({
           title: "Admin login successful",
-          description: `Welcome ${ADMIN_CREDENTIALS.name}`,
+          description: `Welcome ${env.admin.name}`,
         });
         
         return;
@@ -116,6 +109,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          captchaToken,
+        },
       });
 
       if (error) {
@@ -166,7 +162,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, captchaToken: string) => {
     try {
       setIsLoading(true);
       console.log("Attempting sign up for:", email);
@@ -177,6 +173,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         options: {
           data: { full_name: fullName },
           emailRedirectTo: `${window.location.origin}/dashboard`,
+          captchaToken,
         },
       });
 
